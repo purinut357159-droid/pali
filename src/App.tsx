@@ -13,6 +13,7 @@ import { ReviewNotebook } from './components/ReviewNotebook';
 import { CharacterSelectModal } from './components/CharacterSelectModal';
 import type { PlayerSetupConfig } from './components/CharacterSelectModal';
 import { WinnerModal } from './components/WinnerModal';
+import { ChatWidget } from './components/ChatWidget';
 import { addWrongQuestionToSRS, markQuestionMastered } from './utils/srsEngine';
 import { audioManager } from './utils/audioManager';
 
@@ -672,6 +673,9 @@ export const App: React.FC = () => {
           onRestart={() => setGameState((prev) => ({ ...prev, gameStatus: 'setup' }))}
         />
       )}
+
+      {/* In-App Auto-Reply Chatbot Assistant */}
+      <ChatWidget />
     </div>
   );
 };
