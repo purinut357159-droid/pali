@@ -76,6 +76,8 @@ export interface Player {
   aiDifficulty?: 'easy' | 'medium' | 'hard';
   color: string;
   isSkipTurn: boolean;
+  isBankrupt: boolean;
+  doublesStreak: number;
   freeAnswerCards: number;
   ownedProperties: number[]; // Tile IDs
   exp: number;

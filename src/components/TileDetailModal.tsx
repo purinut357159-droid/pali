@@ -1,6 +1,6 @@
 import React from 'react';
 import type { BoardTile, Player } from '../types/game';
-import { X, ArrowUpCircle, ShoppingBag } from 'lucide-react';
+import { X, ArrowUpCircle, ShoppingBag, DollarSign, RefreshCw } from 'lucide-react';
 import { audioManager } from '../utils/audioManager';
 
 interface Props {
@@ -10,6 +10,8 @@ interface Props {
   onClose: () => void;
   onUpgrade?: (tile: BoardTile) => void;
   onBuy?: (tile: BoardTile) => void;
+  onSell?: (tile: BoardTile) => void;
+  onTakeover?: (tile: BoardTile) => void;
   isCurrentPlayerOnTile?: boolean;
 }
 
@@ -20,6 +22,8 @@ export const TileDetailModal: React.FC<Props> = ({
   onClose,
   onUpgrade,
   onBuy,
+  onSell,
+  onTakeover,
   isCurrentPlayerOnTile,
 }) => {
   const upgradeNames = ['ตำรา (Base)', 'ห้องเรียน', 'สำนักเรียน', 'สนามสอบ', 'มหาวิทยาลัยบาลี'];
@@ -39,13 +43,29 @@ export const TileDetailModal: React.FC<Props> = ({
     tile.price &&
     currentPlayer.wisdomPoints >= tile.price;
 
+  const canSell =
+    owner?.id === currentPlayer.id &&
+    tile.type === 'subject';
+
+  const takeoverCost = tile.price ? Math.floor(tile.price * 1.5) : 0;
+  const canTakeover =
+    isCurrentPlayerOnTile &&
+    owner &&
+    owner.id !== currentPlayer.id &&
+    tile.type === 'subject' &&
+    currentPlayer.wisdomPoints >= takeoverCost;
+
+  const sellPrice = tile.price
+    ? Math.floor(tile.price * 0.5 + (tile.upgradeLevel || 0) * (tile.upgradeCost || 0) * 0.5)
+    : 0;
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div
         className="glass-panel"
         style={{
           width: '100%',
-          maxWidth: '440px',
+          maxWidth: '460px',
           padding: '24px',
           border: `2px solid ${tile.color || 'var(--primary-gold)'}`,
         }}
@@ -98,7 +118,7 @@ export const TileDetailModal: React.FC<Props> = ({
         {tile.type === 'subject' && tile.rents && (
           <div style={{ marginBottom: '16px' }}>
             <h4 style={{ fontSize: '0.85rem', color: 'var(--accent-gold)', marginBottom: '8px' }}>
-              📊 ตารางค่าผ่านทาง & ระดับการอัปเกรด
+              📊 ตารางค่าผ่านทาง (Monopoly Rent Table)
             </h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               {tile.rents.map((rent, idx) => {
@@ -129,7 +149,7 @@ export const TileDetailModal: React.FC<Props> = ({
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '16px' }}>
           {canBuy && onBuy && (
             <button
               onClick={() => {
@@ -137,7 +157,7 @@ export const TileDetailModal: React.FC<Props> = ({
                 onClose();
               }}
               className="gold-button"
-              style={{ flex: 1, justifyContent: 'center' }}
+              style={{ justifyContent: 'center' }}
             >
               <ShoppingBag size={18} />
               ซื้อวิชา (💡 {tile.price} แต้ม)
@@ -152,10 +172,39 @@ export const TileDetailModal: React.FC<Props> = ({
                 onClose();
               }}
               className="gold-button"
-              style={{ flex: 1, justifyContent: 'center' }}
+              style={{ justifyContent: 'center' }}
             >
               <ArrowUpCircle size={18} />
               อัปเกรดเป็น {upgradeNames[(tile.upgradeLevel || 0) + 1]} (💡 {tile.upgradeCost} แต้ม)
+            </button>
+          )}
+
+          {canTakeover && onTakeover && (
+            <button
+              onClick={() => {
+                onTakeover(tile);
+                audioManager.playUpgradeSound();
+                onClose();
+              }}
+              className="gold-button"
+              style={{ justifyContent: 'center', background: 'linear-gradient(135deg, #a855f7, #ec4899)' }}
+            >
+              <RefreshCw size={18} />
+              เทคโอเวอร์วิชาจากคู่แข่ง (💡 {takeoverCost} แต้ม)
+            </button>
+          )}
+
+          {canSell && onSell && (
+            <button
+              onClick={() => {
+                onSell(tile);
+                onClose();
+              }}
+              className="secondary-button"
+              style={{ justifyContent: 'center', display: 'flex', alignItems: 'center', gap: '8px', color: '#f87171', borderColor: 'rgba(239,68,68,0.4)' }}
+            >
+              <DollarSign size={18} />
+              ขายวิชาคืนให้สำนักเรียน (+💡 {sellPrice} แต้ม)
             </button>
           )}
         </div>

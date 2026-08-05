@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import type { GameState, Player, BoardTile, Question, CardEffect, GameMode } from './types/game';
+import type { GameState, Player, BoardTile, Question, CardEffect, GameMode, SubjectCategory } from './types/game';
 import { BOARD_TILES } from './data/boardConfig';
 import { QUESTION_BANK } from './data/questionBank';
 import { BOON_CARDS, KARMA_CARDS } from './data/cardsData';
@@ -42,6 +42,7 @@ export const App: React.FC = () => {
   const [activeEventCard, setActiveEventCard] = useState<{ card: CardEffect; player: Player } | null>(null);
   const [showReviewNotebook, setShowReviewNotebook] = useState<boolean>(false);
   const [isMuted, setIsMuted] = useState<boolean>(false);
+  const [rolledDoubles, setRolledDoubles] = useState<boolean>(false);
 
   const addLog = (text: string, type: 'info' | 'success' | 'warning' | 'danger' = 'info') => {
     const newLog = {
@@ -69,6 +70,8 @@ export const App: React.FC = () => {
       aiDifficulty: 'medium',
       color: playerColors[idx % playerColors.length],
       isSkipTurn: false,
+      isBankrupt: false,
+      doublesStreak: 0,
       freeAnswerCards: 0,
       ownedProperties: [],
       exp: 0,
@@ -90,7 +93,13 @@ export const App: React.FC = () => {
       reviewItems: [],
     });
 
-    addLog(`🎲 เริ่มเกมบาลีเศรษฐี (${configs.length} ผู้เล่น)!`, 'success');
+    addLog(`🎲 เริ่มเกมบาลีเศรษฐี (${configs.length} ผู้เล่น)! กฎเศรษฐีสากลเปิดใช้งาน`, 'success');
+  };
+
+  const hasColorGroupMonopoly = (tiles: BoardTile[], playerId: string, category?: SubjectCategory): boolean => {
+    if (!category) return false;
+    const categoryTiles = tiles.filter((t) => t.category === category);
+    return categoryTiles.length > 0 && categoryTiles.every((t) => t.ownerId === playerId);
   };
 
   const handleRollDice = () => {
@@ -99,9 +108,15 @@ export const App: React.FC = () => {
     audioManager.playDiceRoll();
     const d1 = Math.floor(Math.random() * 6) + 1;
     const d2 = Math.floor(Math.random() * 6) + 1;
+    const isDoubles = d1 === d2;
     const totalStep = d1 + d2;
 
     const currentPlayer = gameState.players[gameState.currentTurnPlayerIndex];
+
+    if (currentPlayer.isBankrupt) {
+      nextTurn();
+      return;
+    }
 
     if (currentPlayer.isSkipTurn) {
       addLog(`${currentPlayer.name} ติดภารกิจทบทวนตำรา ข้ามการเล่น 1 ตา`, 'warning');
@@ -115,7 +130,30 @@ export const App: React.FC = () => {
     }
 
     setGameState((prev) => ({ ...prev, dice: [d1, d2], isDiceRolled: true }));
-    addLog(`${currentPlayer.name} ทอยลูกเต๋าได้ ${d1} + ${d2} = ${totalStep} แต้ม`, 'info');
+    addLog(`${currentPlayer.name} ทอยลูกเต๋าได้ ${d1} + ${d2} = ${totalStep} แต้ม ${isDoubles ? '🎲 (ลูกเต๋าออกคู่!)' : ''}`, 'info');
+
+    let currentDoubles = isDoubles ? currentPlayer.doublesStreak + 1 : 0;
+    setRolledDoubles(isDoubles && currentDoubles < 3);
+
+    if (currentDoubles >= 3) {
+      addLog(`⚠️ ${currentPlayer.name} ทอยลูกเต๋าออกคู่ 3 ครั้งติดต่อกัน! ถูกส่งเข้าเรือนพักผ่อน`, 'danger');
+      setGameState((prev) => {
+        const updatedPlayers = [...prev.players];
+        const p = updatedPlayers[prev.currentTurnPlayerIndex];
+        p.position = 10;
+        p.isSkipTurn = true;
+        p.doublesStreak = 0;
+        return { ...prev, players: updatedPlayers };
+      });
+      setTimeout(nextTurn, 1000);
+      return;
+    }
+
+    setGameState((prev) => {
+      const updatedPlayers = [...prev.players];
+      updatedPlayers[prev.currentTurnPlayerIndex].doublesStreak = currentDoubles;
+      return { ...prev, players: updatedPlayers };
+    });
 
     const oldPos = currentPlayer.position;
     const newPos = (oldPos + totalStep) % 40;
@@ -167,9 +205,7 @@ export const App: React.FC = () => {
       triggerQuestion(tile, 'exam', 'สนามสอบเปรียญ! ตอบถูกรับโบนัสใหญ่ +300 แต้ม');
     } else {
       addLog(`${currentPlayer.name} พักผ่อน ณ ${tile.name}`, 'info');
-      if (currentPlayer.isAi) {
-        setTimeout(nextTurn, 1000);
-      }
+      finishTurnCheck();
     }
   };
 
@@ -209,7 +245,6 @@ export const App: React.FC = () => {
   const handleAnswerQuiz = (isCorrect: boolean) => {
     if (!activeQuiz) return;
     const { question, targetTile, mode } = activeQuiz;
-    const currentPlayer = gameState.players[gameState.currentTurnPlayerIndex];
 
     setGameState((prev) => {
       const updatedPlayers = [...prev.players];
@@ -235,9 +270,13 @@ export const App: React.FC = () => {
         } else if (mode === 'rent' && targetTile) {
           const owner = prev.players.find((item) => item.id === targetTile.ownerId);
           if (owner) {
-            const fullRent = targetTile.rents ? targetTile.rents[targetTile.upgradeLevel || 0] : 50;
-            const discountedRent = Math.floor(fullRent * 0.5);
-            p.wisdomPoints = Math.max(0, p.wisdomPoints - discountedRent);
+            let baseRent = targetTile.rents ? targetTile.rents[targetTile.upgradeLevel || 0] : 50;
+            if (targetTile.upgradeLevel === 0 && hasColorGroupMonopoly(prev.tiles, owner.id, targetTile.category)) {
+              baseRent *= 2;
+              addLog(`🏠 ${owner.name} ครอบครองวิชาหมวด ${targetTile.category} ครบเซ็ต! ค่าผ่านทาง x2`, 'warning');
+            }
+            const discountedRent = Math.floor(baseRent * 0.5);
+            p.wisdomPoints -= discountedRent;
             owner.wisdomPoints += discountedRent;
             addLog(`${p.name} ตอบถูก! จ่ายค่าผ่านทางเพียงครึ่งเดียว (${discountedRent} แต้ม)`, 'info');
           }
@@ -253,11 +292,24 @@ export const App: React.FC = () => {
         if (mode === 'rent' && targetTile) {
           const owner = prev.players.find((item) => item.id === targetTile.ownerId);
           if (owner) {
-            const fullRent = targetTile.rents ? targetTile.rents[targetTile.upgradeLevel || 0] : 50;
-            p.wisdomPoints = Math.max(0, p.wisdomPoints - fullRent);
-            owner.wisdomPoints += fullRent;
-            addLog(`${p.name} ตอบผิด! จ่ายค่าผ่านทางเต็มจำนวน (${fullRent} แต้ม)`, 'danger');
+            let baseRent = targetTile.rents ? targetTile.rents[targetTile.upgradeLevel || 0] : 50;
+            if (targetTile.upgradeLevel === 0 && hasColorGroupMonopoly(prev.tiles, owner.id, targetTile.category)) {
+              baseRent *= 2;
+              addLog(`🏠 ${owner.name} ครอบครองวิชาหมวด ${targetTile.category} ครบเซ็ต! ค่าผ่านทาง x2`, 'warning');
+            }
+            p.wisdomPoints -= baseRent;
+            owner.wisdomPoints += baseRent;
+            addLog(`${p.name} ตอบผิด! จ่ายค่าผ่านทางเต็มจำนวน (${baseRent} แต้ม)`, 'danger');
           }
+        }
+      }
+
+      if (p.wisdomPoints <= 0) {
+        if (p.ownedProperties.length === 0) {
+          p.isBankrupt = true;
+          addLog(`💥 ${p.name} แต้มปัญญาหมดและไม่มีวิชาเหลือ! ล้มละลายออกจากการแข่งขัน`, 'danger');
+        } else {
+          addLog(`⚠️ ${p.name} แต้มปัญญาเหลือน้อยกว่า 0 สามารถขายวิชาคืนให้สำนักเรียนได้`, 'warning');
         }
       }
 
@@ -265,8 +317,71 @@ export const App: React.FC = () => {
     });
 
     setActiveQuiz(null);
-    if (currentPlayer.isAi) {
-      setTimeout(nextTurn, 1000);
+    finishTurnCheck();
+  };
+
+  const handleSellProperty = (tile: BoardTile) => {
+    const currentPlayer = gameState.players[gameState.currentTurnPlayerIndex];
+    if (tile.ownerId !== currentPlayer.id || !tile.price) return;
+
+    const sellPrice = Math.floor(tile.price * 0.5 + (tile.upgradeLevel || 0) * (tile.upgradeCost || 0) * 0.5);
+
+    setGameState((prev) => {
+      const updatedPlayers = [...prev.players];
+      const p = updatedPlayers.find((item) => item.id === currentPlayer.id);
+      if (!p) return prev;
+
+      p.wisdomPoints += sellPrice;
+      p.ownedProperties = p.ownedProperties.filter((id) => id !== tile.id);
+
+      const updatedTiles = prev.tiles.map((t) =>
+        t.id === tile.id ? { ...t, ownerId: null, upgradeLevel: 0 as const } : t
+      );
+
+      addLog(`${p.name} ขายวิชา "${tile.name}" คืนให้สำนักเรียน รับ +${sellPrice} แต้มปัญญา`, 'info');
+      return { ...prev, players: updatedPlayers, tiles: updatedTiles };
+    });
+  };
+
+  const handleTakeoverProperty = (tile: BoardTile) => {
+    const currentPlayer = gameState.players[gameState.currentTurnPlayerIndex];
+    const takeoverCost = tile.price ? Math.floor(tile.price * 1.5) : 0;
+
+    if (!tile.ownerId || currentPlayer.wisdomPoints < takeoverCost) return;
+
+    const previousOwnerId = tile.ownerId;
+
+    setGameState((prev) => {
+      const updatedPlayers = [...prev.players];
+      const buyer = updatedPlayers.find((p) => p.id === currentPlayer.id);
+      const seller = updatedPlayers.find((p) => p.id === previousOwnerId);
+
+      if (!buyer || !seller) return prev;
+
+      buyer.wisdomPoints -= takeoverCost;
+      seller.wisdomPoints += takeoverCost;
+
+      seller.ownedProperties = seller.ownedProperties.filter((id) => id !== tile.id);
+      buyer.ownedProperties.push(tile.id);
+
+      const updatedTiles = prev.tiles.map((t) =>
+        t.id === tile.id ? { ...t, ownerId: buyer.id } : t
+      );
+
+      addLog(`⚡ ${buyer.name} เทคโอเวอร์วิชา "${tile.name}" จาก ${seller.name} (${takeoverCost} แต้ม)!`, 'success');
+      return { ...prev, players: updatedPlayers, tiles: updatedTiles };
+    });
+  };
+
+  const finishTurnCheck = () => {
+    const currentPlayer = gameState.players[gameState.currentTurnPlayerIndex];
+    if (rolledDoubles && !currentPlayer.isAi && !currentPlayer.isBankrupt && !currentPlayer.isSkipTurn) {
+      addLog(`🎲 ${currentPlayer.name} ได้สิทธิ์ทอยลูกเต๋าอีกครั้ง (ลูกเต๋าออกคู่)`, 'info');
+      setGameState((prev) => ({ ...prev, isDiceRolled: false }));
+    } else {
+      if (currentPlayer.isAi) {
+        setTimeout(nextTurn, 1000);
+      }
     }
   };
 
@@ -274,11 +389,24 @@ export const App: React.FC = () => {
     setActiveQuiz(null);
     setActiveTileDetail(null);
     setActiveEventCard(null);
+    setRolledDoubles(false);
 
     setGameState((prev) => {
-      let nextIndex = (prev.currentTurnPlayerIndex + 1) % prev.players.length;
-      let nextRound = prev.currentRound;
+      let activePlayers = prev.players.filter((p) => !p.isBankrupt);
+      if (activePlayers.length <= 1 && prev.players.length > 1) {
+        return {
+          ...prev,
+          gameStatus: 'game_over',
+          winner: activePlayers[0] || prev.players[0],
+        };
+      }
 
+      let nextIndex = (prev.currentTurnPlayerIndex + 1) % prev.players.length;
+      while (prev.players[nextIndex]?.isBankrupt) {
+        nextIndex = (nextIndex + 1) % prev.players.length;
+      }
+
+      let nextRound = prev.currentRound;
       if (nextIndex === 0) {
         nextRound += 1;
         addLog(`--- เริ่มรอบที่ ${nextRound} ---`, 'info');
@@ -288,7 +416,7 @@ export const App: React.FC = () => {
       let winner: Player | null = null;
 
       if (isGameOver) {
-        const sorted = [...prev.players].sort((a, b) => b.wisdomPoints - a.wisdomPoints);
+        const sorted = [...activePlayers].sort((a, b) => b.wisdomPoints - a.wisdomPoints);
         winner = sorted[0];
       }
 
@@ -303,12 +431,11 @@ export const App: React.FC = () => {
     });
   };
 
-  // AI Effect 1: Auto Roll Dice when it's AI turn
   useEffect(() => {
     if (gameState.gameStatus !== 'playing') return;
     const currentPlayer = gameState.players[gameState.currentTurnPlayerIndex];
 
-    if (currentPlayer && currentPlayer.isAi && !gameState.isDiceRolled && !activeQuiz && !activeEventCard && !activeTileDetail) {
+    if (currentPlayer && currentPlayer.isAi && !currentPlayer.isBankrupt && !gameState.isDiceRolled && !activeQuiz && !activeEventCard && !activeTileDetail) {
       const timer = setTimeout(() => {
         handleRollDice();
       }, 1000);
@@ -316,18 +443,16 @@ export const App: React.FC = () => {
     }
   }, [gameState.currentTurnPlayerIndex, gameState.isDiceRolled, gameState.gameStatus, activeQuiz, activeEventCard, activeTileDetail]);
 
-  // AI Effect 2: Auto Answer Quiz / Exam / Buy / Rent
   useEffect(() => {
     if (activeQuiz && gameState.players[gameState.currentTurnPlayerIndex]?.isAi) {
       const timer = setTimeout(() => {
-        const isCorrect = Math.random() < 0.75; // AI has 75% accuracy
+        const isCorrect = Math.random() < 0.75;
         handleAnswerQuiz(isCorrect);
       }, 1200);
       return () => clearTimeout(timer);
     }
   }, [activeQuiz]);
 
-  // AI Effect 3: Auto Handle Event Cards (Boon / Karma)
   useEffect(() => {
     if (activeEventCard && activeEventCard.player.isAi) {
       const timer = setTimeout(() => {
@@ -338,12 +463,10 @@ export const App: React.FC = () => {
     }
   }, [activeEventCard]);
 
-  // AI Effect 4: Auto Handle Own Tile Detail (Upgrade or Pass)
   useEffect(() => {
     if (activeTileDetail && gameState.players[gameState.currentTurnPlayerIndex]?.isAi) {
       const timer = setTimeout(() => {
         const currentPlayer = gameState.players[gameState.currentTurnPlayerIndex];
-        // AI upgrades if it has enough points and level < 4
         if (
           activeTileDetail.ownerId === currentPlayer.id &&
           activeTileDetail.upgradeLevel !== undefined &&
@@ -458,6 +581,8 @@ export const App: React.FC = () => {
             });
             if (currentPlayer.isAi) setTimeout(nextTurn, 1000);
           }}
+          onSell={handleSellProperty}
+          onTakeover={handleTakeoverProperty}
         />
       )}
 
