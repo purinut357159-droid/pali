@@ -1,6 +1,16 @@
 import React from 'react';
-import type { BoardTile, Player, UpgradeLevel } from '../types/game';
-import { Dices } from 'lucide-react';
+import type { BoardTile, Player, GameLog } from '../types/game';
+import { DiceRoller } from './DiceRoller';
+import {
+  Book,
+  Gift,
+  HelpCircle,
+  Award,
+  Coffee,
+  Flag,
+  Sparkles,
+  Zap,
+} from 'lucide-react';
 
 interface Props {
   tiles: BoardTile[];
@@ -10,7 +20,7 @@ interface Props {
   onRollDice: () => void;
   isDiceRolled: boolean;
   dice: [number, number];
-  logs: { id: string; text: string; type: string }[];
+  logs: GameLog[];
 }
 
 export const Board: React.FC<Props> = ({
@@ -23,78 +33,87 @@ export const Board: React.FC<Props> = ({
   dice,
   logs,
 }) => {
-  const getTileGridPosition = (index: number) => {
-    if (index >= 0 && index <= 10) {
-      return { gridRow: 1, gridColumn: index + 1 };
-    } else if (index > 10 && index <= 20) {
-      return { gridColumn: 11, gridRow: index - 10 + 1 };
-    } else if (index > 20 && index <= 30) {
-      return { gridRow: 11, gridColumn: 11 - (index - 20) };
-    } else {
-      return { gridColumn: 1, gridRow: 11 - (index - 30) };
+  const getTileIcon = (tile: BoardTile) => {
+    switch (tile.type) {
+      case 'start':
+        return <Flag size={16} color="#f59e0b" />;
+      case 'boon':
+        return <Gift size={16} color="#10b981" />;
+      case 'karma':
+        return <Zap size={16} color="#ef4444" />;
+      case 'quiz':
+        return <HelpCircle size={16} color="#3b82f6" />;
+      case 'exam':
+        return <Award size={16} color="#ec4899" />;
+      case 'rest':
+        return <Coffee size={16} color="#8b5cf6" />;
+      case 'subject':
+      default:
+        return <Book size={14} color={tile.color || '#d4af37'} />;
     }
   };
 
-  const getUpgradeIcon = (level?: UpgradeLevel) => {
-    switch (level) {
-      case 1: return '📖';
-      case 2: return '🏫';
-      case 3: return '🏛️';
-      case 4: return '👑';
-      default: return '📜';
+  const getTilePositionStyle = (id: number) => {
+    if (id >= 0 && id <= 10) {
+      return { gridColumn: 11 - id, gridRow: 11 };
+    } else if (id >= 11 && id <= 20) {
+      return { gridColumn: 1, gridRow: 11 - (id - 10) };
+    } else if (id >= 21 && id <= 30) {
+      return { gridColumn: id - 19, gridRow: 1 };
+    } else {
+      return { gridColumn: 11, gridRow: id - 29 };
     }
   };
 
   return (
     <div className="board-container">
       {tiles.map((tile) => {
-        const { gridRow, gridColumn } = getTileGridPosition(tile.id);
-        const owner = players.find((p) => p.id === tile.ownerId);
         const playersOnTile = players.filter((p) => p.position === tile.id);
+        const owner = players.find((p) => p.id === tile.ownerId);
 
         return (
           <div
             key={tile.id}
             className="board-tile"
             style={{
-              gridRow,
-              gridColumn,
-              borderColor: owner ? owner.color : 'rgba(255,255,255,0.12)',
-              boxShadow: owner ? `inset 0 0 8px ${owner.color}44` : undefined,
+              ...getTilePositionStyle(tile.id),
+              borderColor: owner ? owner.color : 'rgba(212, 175, 55, 0.2)',
             }}
             onClick={() => onTileClick(tile)}
           >
-            <div
-              className="tile-header"
-              style={{
-                backgroundColor: tile.color || '#334155',
-                color: '#ffffff',
-              }}
-            >
-              {tile.name}
+            {tile.category && (
+              <div
+                className="board-tile-category-bar"
+                style={{ backgroundColor: tile.color || '#d4af37' }}
+              />
+            )}
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '2px', fontWeight: 600 }}>
+              {getTileIcon(tile)}
+              <span style={{ color: tile.color || '#fff', fontSize: '0.65rem' }}>
+                {tile.name}
+              </span>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', margin: '2px 0' }}>
-              <span style={{ fontSize: '1.1rem' }}>{tile.icon}</span>
-              {tile.price && (
-                <span style={{ fontSize: '0.6rem', color: 'var(--accent-gold)', fontWeight: 600 }}>
-                  💡 {tile.price}
-                </span>
-              )}
-            </div>
+            {tile.type === 'subject' && (
+              <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>
+                {tile.price ? `${tile.price} 💡` : ''}
+              </div>
+            )}
 
-            {tile.ownerId && tile.upgradeLevel !== undefined && (
+            {owner && (
               <div
                 style={{
                   fontSize: '0.55rem',
-                  background: owner ? owner.color : '#333',
+                  background: owner.color,
                   color: '#000',
+                  padding: '1px 4px',
                   borderRadius: '4px',
-                  padding: '1px 3px',
                   fontWeight: 700,
+                  marginTop: '1px',
                 }}
               >
-                {getUpgradeIcon(tile.upgradeLevel)} Lv.{tile.upgradeLevel}
+                {owner.name.substring(0, 4)} {tile.upgradeLevel ? `★${tile.upgradeLevel}` : ''}
               </div>
             )}
 
@@ -115,64 +134,28 @@ export const Board: React.FC<Props> = ({
       })}
 
       <div className="board-center">
-        <div style={{ textAlign: 'center', marginBottom: '12px' }}>
-          <h2 className="gold-gradient-text" style={{ fontSize: '1.2rem', marginBottom: '4px' }}>
-            กระดานบาลี ๔๐ วิชา
+        <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+          <h2 className="gold-gradient-text" style={{ fontSize: '1.3rem', marginBottom: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+            <Sparkles size={20} color="var(--primary-gold)" />
+            กระดานบาลี ๔๔ วิชา
+            <Sparkles size={20} color="var(--primary-gold)" />
           </h2>
-          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-            ตาของ: <strong style={{ color: currentTurnPlayer.color }}>{currentTurnPlayer.name}</strong>
+          <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+            ตาของ: <strong style={{ color: currentTurnPlayer.color, fontSize: '0.95rem' }}>{currentTurnPlayer.name}</strong> {currentTurnPlayer.isAi && '(AI)'}
           </p>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <div
-              style={{
-                width: '44px',
-                height: '44px',
-                background: 'linear-gradient(135deg, #ffffff, #e2e8f0)',
-                color: '#0f172a',
-                borderRadius: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '1.5rem',
-                fontWeight: 800,
-                boxShadow: '0 4px 10px rgba(0,0,0,0.5)',
-              }}
-            >
-              {dice[0]}
-            </div>
-            <div
-              style={{
-                width: '44px',
-                height: '44px',
-                background: 'linear-gradient(135deg, #ffffff, #e2e8f0)',
-                color: '#0f172a',
-                borderRadius: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '1.5rem',
-                fontWeight: 800,
-                boxShadow: '0 4px 10px rgba(0,0,0,0.5)',
-              }}
-            >
-              {dice[1]}
-            </div>
-          </div>
-
-          <button
-            onClick={onRollDice}
-            disabled={isDiceRolled}
-            className="gold-button pulse-active"
-            style={{ padding: '10px 20px', fontSize: '1rem' }}
-          >
-            <Dices size={20} />
-            {isDiceRolled ? 'กำลังรับผล' : 'ทอยลูกเต๋า'}
-          </button>
+        {/* 3D Tumbling Rolling Dice Component */}
+        <div style={{ marginBottom: '20px' }}>
+          <DiceRoller
+            dice={dice}
+            isDiceRolled={isDiceRolled}
+            onRollDice={onRollDice}
+            disabled={currentTurnPlayer.isAi}
+          />
         </div>
 
+        {/* Activity Feed Log */}
         <div
           style={{
             width: '100%',
@@ -180,9 +163,9 @@ export const Board: React.FC<Props> = ({
             overflowY: 'auto',
             background: 'rgba(0,0,0,0.4)',
             border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: '8px',
-            padding: '8px',
-            fontSize: '0.72rem',
+            borderRadius: '10px',
+            padding: '10px',
+            fontSize: '0.75rem',
           }}
         >
           {logs.slice(0, 8).map((log) => (
