@@ -77,6 +77,7 @@ export interface Player {
   color: string;
   isSkipTurn: boolean;
   isBankrupt: boolean;
+  hasCompletedFirstLap: boolean;
   doublesStreak: number;
   freeAnswerCards: number;
   ownedProperties: number[]; // Tile IDs

@@ -16,7 +16,6 @@ import { WinnerModal } from './components/WinnerModal';
 import { addWrongQuestionToSRS, markQuestionMastered } from './utils/srsEngine';
 import { audioManager } from './utils/audioManager';
 
-// Helper to shuffle multiple choice options & update correct answer index
 function shuffleQuestionOptions(q: Question): Question {
   const originalCorrectText = q.options[q.correctAnswer];
   const shuffledOptions = [...q.options];
@@ -91,6 +90,7 @@ export const App: React.FC = () => {
       color: playerColors[idx % playerColors.length],
       isSkipTurn: false,
       isBankrupt: false,
+      hasCompletedFirstLap: false,
       doublesStreak: 0,
       freeAnswerCards: 0,
       ownedProperties: [],
@@ -114,7 +114,7 @@ export const App: React.FC = () => {
       askedQuestionIds: [],
     });
 
-    addLog(`🎲 เริ่มเกมบาลีเศรษฐี (${configs.length} ผู้เล่น)! สุ่มคำถามและชอยส์ไม่ซ้ำ`, 'success');
+    addLog(`🎲 เริ่มเกมบาลีเศรษฐี (${configs.length} ผู้เล่น)! กฎ: ต้องวิ่งครบรอบแรกก่อนจึงจะเริ่มซื้อวิชาได้`, 'success');
   };
 
   const hasColorGroupMonopoly = (tiles: BoardTile[], playerId: string, category?: SubjectCategory): boolean => {
@@ -189,7 +189,13 @@ export const App: React.FC = () => {
         if (passedStart) {
           const passBonus = Math.round(200 * p.character.expMultiplier);
           p.wisdomPoints += passBonus;
-          addLog(`${p.name} เดินผ่านจุดเริ่มต้น รับโบนัสแต้มปัญญา +${passBonus} แต้ม!`, 'success');
+
+          if (!p.hasCompletedFirstLap) {
+            p.hasCompletedFirstLap = true;
+            addLog(`🚩 ${p.name} วิ่งครบรอบแรกแล้ว! ปลดล็อกสิทธิ์การซื้อวิชาบนกระดาน`, 'success');
+          } else {
+            addLog(`${p.name} เดินผ่านจุดเริ่มต้น รับโบนัสแต้มปัญญา +${passBonus} แต้ม!`, 'success');
+          }
         }
 
         return { ...prev, players: updatedPlayers };
@@ -207,7 +213,12 @@ export const App: React.FC = () => {
       const owner = gameState.players.find((p) => p.id === tile.ownerId);
 
       if (!owner) {
-        triggerQuestion(tile, 'buy', `ทดสอบความรู้เพื่อซื้อวิชา "${tile.name}"`);
+        if (!currentPlayer.hasCompletedFirstLap) {
+          addLog(`🚫 ${currentPlayer.name} ยังวิ่งไม่ครบ 1 รอบแรก! ไม่สามารถซื้อวิชา "${tile.name}" ได้`, 'warning');
+          finishTurnCheck();
+        } else {
+          triggerQuestion(tile, 'buy', `ทดสอบความรู้เพื่อซื้อวิชา "${tile.name}"`);
+        }
       } else if (owner.id === currentPlayer.id) {
         addLog(`${currentPlayer.name} ตกเมืองวิชาของตนเอง (${tile.name})`, 'info');
         setActiveTileDetail(tile);
@@ -236,10 +247,8 @@ export const App: React.FC = () => {
     );
     const pool = categoryQuestions.length > 0 ? categoryQuestions : QUESTION_BANK;
 
-    // Filter unasked questions to prevent repetition
     let unaskedPool = pool.filter((q) => !gameState.askedQuestionIds.includes(q.id));
 
-    // Reset pool if all questions in category have been asked
     if (unaskedPool.length === 0) {
       unaskedPool = pool;
     }

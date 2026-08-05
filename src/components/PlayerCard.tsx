@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Player } from '../types/game';
-import { Award, Zap, Home } from 'lucide-react';
+import { Award, Zap, Home, Flag } from 'lucide-react';
 
 interface Props {
   player: Player;
@@ -69,7 +69,7 @@ export const PlayerCard: React.FC<Props> = ({ player, isCurrentTurn }) => {
         </strong>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', fontSize: '0.75rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', fontSize: '0.75rem', marginBottom: '6px' }}>
         <div style={{ background: 'rgba(255,255,255,0.03)', padding: '4px 6px', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
           <Home size={12} color="#3b82f6" />
           <span>วิชา: {player.ownedProperties.length}</span>
@@ -80,9 +80,27 @@ export const PlayerCard: React.FC<Props> = ({ player, isCurrentTurn }) => {
         </div>
       </div>
 
+      {/* 1st Lap Status Badge */}
       <div
         style={{
-          marginTop: '8px',
+          fontSize: '0.68rem',
+          padding: '4px 6px',
+          borderRadius: '6px',
+          background: player.hasCompletedFirstLap ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+          border: `1px solid ${player.hasCompletedFirstLap ? 'rgba(34, 197, 94, 0.4)' : 'rgba(239, 68, 68, 0.4)'}`,
+          color: player.hasCompletedFirstLap ? '#4ade80' : '#f87171',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '4px',
+          marginBottom: '6px',
+        }}
+      >
+        <Flag size={12} />
+        <span>{player.hasCompletedFirstLap ? 'ปลดล็อกซื้อวิชาแล้ว (ผ่านรอบ 1)' : 'ยังไม่ครบรอบ 1 (ซื้อวิชาไม่ได้)'}</span>
+      </div>
+
+      <div
+        style={{
           fontSize: '0.65rem',
           color: 'var(--text-muted)',
           background: 'rgba(212, 175, 55, 0.05)',
