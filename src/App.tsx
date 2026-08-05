@@ -303,6 +303,7 @@ export const App: React.FC = () => {
     });
   };
 
+  // AI Effect 1: Auto Roll Dice when it's AI turn
   useEffect(() => {
     if (gameState.gameStatus !== 'playing') return;
     const currentPlayer = gameState.players[gameState.currentTurnPlayerIndex];
@@ -310,20 +311,64 @@ export const App: React.FC = () => {
     if (currentPlayer && currentPlayer.isAi && !gameState.isDiceRolled && !activeQuiz && !activeEventCard && !activeTileDetail) {
       const timer = setTimeout(() => {
         handleRollDice();
-      }, 1200);
+      }, 1000);
       return () => clearTimeout(timer);
     }
   }, [gameState.currentTurnPlayerIndex, gameState.isDiceRolled, gameState.gameStatus, activeQuiz, activeEventCard, activeTileDetail]);
 
+  // AI Effect 2: Auto Answer Quiz / Exam / Buy / Rent
   useEffect(() => {
     if (activeQuiz && gameState.players[gameState.currentTurnPlayerIndex]?.isAi) {
       const timer = setTimeout(() => {
-        const isCorrect = Math.random() < 0.7;
+        const isCorrect = Math.random() < 0.75; // AI has 75% accuracy
         handleAnswerQuiz(isCorrect);
-      }, 1500);
+      }, 1200);
       return () => clearTimeout(timer);
     }
   }, [activeQuiz]);
+
+  // AI Effect 3: Auto Handle Event Cards (Boon / Karma)
+  useEffect(() => {
+    if (activeEventCard && activeEventCard.player.isAi) {
+      const timer = setTimeout(() => {
+        setActiveEventCard(null);
+        nextTurn();
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [activeEventCard]);
+
+  // AI Effect 4: Auto Handle Own Tile Detail (Upgrade or Pass)
+  useEffect(() => {
+    if (activeTileDetail && gameState.players[gameState.currentTurnPlayerIndex]?.isAi) {
+      const timer = setTimeout(() => {
+        const currentPlayer = gameState.players[gameState.currentTurnPlayerIndex];
+        // AI upgrades if it has enough points and level < 4
+        if (
+          activeTileDetail.ownerId === currentPlayer.id &&
+          activeTileDetail.upgradeLevel !== undefined &&
+          activeTileDetail.upgradeLevel < 4 &&
+          activeTileDetail.upgradeCost &&
+          currentPlayer.wisdomPoints >= activeTileDetail.upgradeCost
+        ) {
+          const tile = activeTileDetail;
+          setGameState((prev) => {
+            const updatedTiles = prev.tiles.map((t) =>
+              t.id === tile.id ? { ...t, upgradeLevel: Math.min(4, (t.upgradeLevel || 0) + 1) as any } : t
+            );
+            const updatedPlayers = [...prev.players];
+            const p = updatedPlayers[prev.currentTurnPlayerIndex];
+            if (tile.upgradeCost) p.wisdomPoints -= tile.upgradeCost;
+            addLog(`${p.name} อัปเกรดวิชา "${tile.name}" สำเร็จ!`, 'success');
+            return { ...prev, tiles: updatedTiles, players: updatedPlayers };
+          });
+        }
+        setActiveTileDetail(null);
+        nextTurn();
+      }, 1200);
+      return () => clearTimeout(timer);
+    }
+  }, [activeTileDetail]);
 
   const currentPlayer = gameState.players[gameState.currentTurnPlayerIndex];
 
