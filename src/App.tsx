@@ -85,7 +85,7 @@ export const App: React.FC = () => {
       id: `p_${idx + 1}`,
       name: cfg.name,
       character: cfg.character,
-      wisdomPoints: 2000 + cfg.character.initialWisdomBonus,
+      wisdomPoints: 2000, // เท่ากันทุกคน 2000 แต้มเมื่อเริ่มเกม
       position: 0,
       isAi: cfg.isAi,
       aiDifficulty: 'medium',
@@ -94,7 +94,7 @@ export const App: React.FC = () => {
       isBankrupt: false,
       hasCompletedFirstLap: false,
       doublesStreak: 0,
-      freeAnswerCards: 0,
+      freeAnswerCards: cfg.character.id === 'student' ? 1 : 0,
       ownedProperties: [],
       exp: 0,
       level: 1,
@@ -116,7 +116,7 @@ export const App: React.FC = () => {
       askedQuestionIds: [],
     });
 
-    addLog(`🎲 เริ่มเกมบาลีเศรษฐี (${configs.length} ผู้เล่น)! เดินผ่านจุดเริ่มต้นรับโบนัสฟรี +500 แต้มปัญญา`, 'success');
+    addLog(`🎲 เริ่มเกมบาลีเศรษฐี (${configs.length} ผู้เล่น)! ผู้เล่นทุกคนเริ่มด้วย 2,000 แต้มปัญญาเท่ากัน`, 'success');
   };
 
   const hasColorGroupMonopoly = (tiles: BoardTile[], playerId: string, category?: SubjectCategory): boolean => {
