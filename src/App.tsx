@@ -116,7 +116,7 @@ export const App: React.FC = () => {
       askedQuestionIds: [],
     });
 
-    addLog(`🎲 เริ่มเกมบาลีเศรษฐี (${configs.length} ผู้เล่น)! กฎ: ต้องวิ่งครบรอบแรกก่อนจึงจะเริ่มซื้อวิชาได้`, 'success');
+    addLog(`🎲 เริ่มเกมบาลีเศรษฐี (${configs.length} ผู้เล่น)! เดินผ่านจุดเริ่มต้นรับโบนัสฟรี +500 แต้มปัญญา`, 'success');
   };
 
   const hasColorGroupMonopoly = (tiles: BoardTile[], playerId: string, category?: SubjectCategory): boolean => {
@@ -184,7 +184,6 @@ export const App: React.FC = () => {
 
     setMovingPlayerId(currentPlayer.id);
 
-    // Step-by-Step Jumping Animation
     let currentStep = 0;
     let stepPos = oldPos;
 
@@ -210,14 +209,15 @@ export const App: React.FC = () => {
           const p = updatedPlayers[prev.currentTurnPlayerIndex];
 
           if (passedStart) {
-            const passBonus = Math.round(200 * p.character.expMultiplier);
+            const passBonus = Math.round(500 * p.character.expMultiplier);
             p.wisdomPoints += passBonus;
+            audioManager.playSathuChime();
 
             if (!p.hasCompletedFirstLap) {
               p.hasCompletedFirstLap = true;
-              addLog(`🚩 ${p.name} วิ่งครบรอบแรกแล้ว! ปลดล็อกสิทธิ์การซื้อวิชาบนกระดาน`, 'success');
+              addLog(`🚩 ${p.name} วิ่งครบรอบแรกแล้ว! รับโบนัสฟรี +${passBonus} แต้มปัญญา และปลดล็อกสิทธิ์ซื้อวิชาบนกระดาน`, 'success');
             } else {
-              addLog(`${p.name} เดินผ่านจุดเริ่มต้น รับโบนัสแต้มปัญญา +${passBonus} แต้ม!`, 'success');
+              addLog(`✨ ${p.name} เดินผ่านจุดเริ่มต้น รับโบนัสฟรี +${passBonus} แต้มปัญญา!`, 'success');
             }
           }
 
