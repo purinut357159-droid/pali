@@ -93,7 +93,7 @@ export const App: React.FC = () => {
       reviewItems: [],
     });
 
-    addLog(`🎲 เริ่มเกมบาลีเศรษฐี (${configs.length} ผู้เล่น)! กฎเศรษฐีสากลเปิดใช้งาน`, 'success');
+    addLog(`🎲 เริ่มเกมบาลีเศรษฐี (${configs.length} ผู้เล่น)! สลับผู้เล่นวนรอบอัตโนมัติ`, 'success');
   };
 
   const hasColorGroupMonopoly = (tiles: BoardTile[], playerId: string, category?: SubjectCategory): boolean => {
@@ -375,13 +375,12 @@ export const App: React.FC = () => {
 
   const finishTurnCheck = () => {
     const currentPlayer = gameState.players[gameState.currentTurnPlayerIndex];
-    if (rolledDoubles && !currentPlayer.isAi && !currentPlayer.isBankrupt && !currentPlayer.isSkipTurn) {
+    if (rolledDoubles && !currentPlayer.isBankrupt && !currentPlayer.isSkipTurn) {
       addLog(`🎲 ${currentPlayer.name} ได้สิทธิ์ทอยลูกเต๋าอีกครั้ง (ลูกเต๋าออกคู่)`, 'info');
       setGameState((prev) => ({ ...prev, isDiceRolled: false }));
     } else {
-      if (currentPlayer.isAi) {
-        setTimeout(nextTurn, 1000);
-      }
+      // Transition turn to next player automatically for both Human and AI
+      setTimeout(nextTurn, currentPlayer.isAi ? 1000 : 800);
     }
   };
 
@@ -431,6 +430,7 @@ export const App: React.FC = () => {
     });
   };
 
+  // AI Effects
   useEffect(() => {
     if (gameState.gameStatus !== 'playing') return;
     const currentPlayer = gameState.players[gameState.currentTurnPlayerIndex];
@@ -566,7 +566,12 @@ export const App: React.FC = () => {
           tile={activeTileDetail}
           owner={gameState.players.find((p) => p.id === activeTileDetail.ownerId)}
           currentPlayer={currentPlayer}
-          onClose={() => setActiveTileDetail(null)}
+          onClose={() => {
+            setActiveTileDetail(null);
+            if (currentPlayer.position === activeTileDetail.id) {
+              finishTurnCheck();
+            }
+          }}
           isCurrentPlayerOnTile={currentPlayer.position === activeTileDetail.id}
           onUpgrade={(tile) => {
             setGameState((prev) => {
@@ -579,10 +584,13 @@ export const App: React.FC = () => {
               addLog(`${p.name} อัปเกรดวิชา "${tile.name}" สำเร็จ!`, 'success');
               return { ...prev, tiles: updatedTiles, players: updatedPlayers };
             });
-            if (currentPlayer.isAi) setTimeout(nextTurn, 1000);
+            finishTurnCheck();
           }}
           onSell={handleSellProperty}
-          onTakeover={handleTakeoverProperty}
+          onTakeover={(tile) => {
+            handleTakeoverProperty(tile);
+            finishTurnCheck();
+          }}
         />
       )}
 
@@ -592,7 +600,7 @@ export const App: React.FC = () => {
           player={activeEventCard.player}
           onClose={() => {
             setActiveEventCard(null);
-            if (currentPlayer.isAi) setTimeout(nextTurn, 1000);
+            finishTurnCheck();
           }}
         />
       )}
