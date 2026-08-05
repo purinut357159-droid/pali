@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import type { GameState, Player, BoardTile, Question, CardEffect, Character, GameMode } from './types/game';
+import type { GameState, Player, BoardTile, Question, CardEffect, GameMode } from './types/game';
 import { BOARD_TILES } from './data/boardConfig';
 import { QUESTION_BANK } from './data/questionBank';
 import { BOON_CARDS, KARMA_CARDS } from './data/cardsData';
@@ -11,6 +11,7 @@ import { TileDetailModal } from './components/TileDetailModal';
 import { EventModal } from './components/EventModal';
 import { ReviewNotebook } from './components/ReviewNotebook';
 import { CharacterSelectModal } from './components/CharacterSelectModal';
+import type { PlayerSetupConfig } from './components/CharacterSelectModal';
 import { WinnerModal } from './components/WinnerModal';
 import { addWrongQuestionToSRS, markQuestionMastered } from './utils/srsEngine';
 import { audioManager } from './utils/audioManager';
@@ -55,34 +56,18 @@ export const App: React.FC = () => {
     }));
   };
 
-  const handleStartGame = (humanChar: Character, aiCount: number, mode: GameMode, rounds: number) => {
-    const humanPlayer: Player = {
-      id: 'p1',
-      name: 'ท่าน (ผู้เล่น)',
-      character: humanChar,
-      wisdomPoints: 2000 + humanChar.initialWisdomBonus,
-      position: 0,
-      isAi: false,
-      color: '#f59e0b',
-      isSkipTurn: false,
-      freeAnswerCards: 0,
-      ownedProperties: [],
-      exp: 0,
-      level: 1,
-      stats: { correctAnswers: 0, totalAnswers: 0, propertiesBought: 0, examsPassed: 0 },
-    };
+  const handleStartGame = (configs: PlayerSetupConfig[], mode: GameMode, rounds: number) => {
+    const playerColors = ['#f59e0b', '#3b82f6', '#ec4899', '#10b981'];
 
-    const aiNames = ['พระอาจารย์ AI', 'ศิษย์พี่ AI', 'มหา AI'];
-    const aiColors = ['#3b82f6', '#ec4899', '#10b981'];
-    const aiPlayers: Player[] = Array.from({ length: aiCount }).map((_, i) => ({
-      id: `ai_${i + 1}`,
-      name: aiNames[i],
-      character: humanChar,
-      wisdomPoints: 2000,
+    const newPlayers: Player[] = configs.map((cfg, idx) => ({
+      id: `p_${idx + 1}`,
+      name: cfg.name,
+      character: cfg.character,
+      wisdomPoints: 2000 + cfg.character.initialWisdomBonus,
       position: 0,
-      isAi: true,
+      isAi: cfg.isAi,
       aiDifficulty: 'medium',
-      color: aiColors[i],
+      color: playerColors[idx % playerColors.length],
       isSkipTurn: false,
       freeAnswerCards: 0,
       ownedProperties: [],
@@ -96,7 +81,7 @@ export const App: React.FC = () => {
       maxRounds: rounds,
       currentRound: 1,
       currentTurnPlayerIndex: 0,
-      players: [humanPlayer, ...aiPlayers],
+      players: newPlayers,
       tiles: BOARD_TILES.map((t) => ({ ...t, ownerId: null, upgradeLevel: 0 })),
       dice: [1, 1],
       isDiceRolled: false,
@@ -105,7 +90,7 @@ export const App: React.FC = () => {
       reviewItems: [],
     });
 
-    addLog('🎲 เริ่มเกมบาลีเศรษฐี! ขอให้นักเรียนบาลีทุกท่านโชคดีในการทดสอบความรู้', 'success');
+    addLog(`🎲 เริ่มเกมบาลีเศรษฐี (${configs.length} ผู้เล่น)!`, 'success');
   };
 
   const handleRollDice = () => {
