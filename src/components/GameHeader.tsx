@@ -28,7 +28,7 @@ export const GameHeader: React.FC<Props> = ({
           <span style={{ fontSize: '1.8rem' }}>🎲</span>
           <div>
             <h1 className="gold-gradient-text" style={{ fontSize: '1.4rem', fontWeight: 700, margin: 0 }}>
-              บาลีเศรษฐี (Pali Tycoon)
+              บาลีส่วนฐี (Pali Tycoon)
             </h1>
             <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>
               ครอบครองวิชา อัปเกรดสำนักเรียน พิชิตความเป็น "มหาเปรียญ"

@@ -45,7 +45,7 @@ async function replyLineMessage(replyToken, messages) {
 
 export default async function handler(req, res) {
   if (req.method === 'GET') {
-    return res.status(200).send('Pali Tycoon LINE Webhook Pali Grammar API Active!');
+    return res.status(200).send('Pali Tycoon (บาลีส่วนฐี) LINE Webhook API Active!');
   }
 
   if (req.method === 'POST') {
@@ -102,7 +102,7 @@ export default async function handler(req, res) {
         } else {
           await replyLineMessage(replyToken, {
             type: 'text',
-            text: '🙏 เจริญพร! พิมพ์ "สุ่มคำถาม" เพื่อทำข้อสอบบาลีไวยากรณ์ล้วน 100% ครับ',
+            text: '🙏 เจริญพร! ยินดีต้อนรับสู่ บาลีส่วนฐี พิมพ์ "สุ่มคำถาม" เพื่อทำข้อสอบบาลีไวยากรณ์ครับ',
           });
         }
       }

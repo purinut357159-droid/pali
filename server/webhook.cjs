@@ -1,6 +1,6 @@
 /**
  * LINE Official Account Auto-Reply Engine
- * โปรเจกต์: บาลีเศรษฐี (Pali Tycoon) - เน้นข้อสอบบาลีไวยากรณ์ 100%
+ * โปรเจกต์: บาลีส่วนฐี (Pali Tycoon) - เน้นข้อสอบบาลีไวยากรณ์ 100%
  */
 
 const express = require('express');
@@ -12,7 +12,6 @@ app.use(express.json());
 const LINE_CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN || 'NGQO5+Hzm4xYanKqb1IY6CHq91ODt4ojsAHk82PAKXfnztP3MkJX3EVfGwcq/2Ot5vkcUB6LDIjK8ZS7yuEDt0wVUHSOiORHCwnw9CgR02tghaSfpGHBfceUpMX7YIYJ3dMKnzMFgpdsffj1qaEMkwdB04t89/1O/w1cDnyilFU=';
 const GITHUB_REPO_URL = 'https://github.com/purinut357159-droid/pali.git';
 
-// คลังข้อสอบเน้นบาลีไวยากรณ์ล้วน 100%
 const LINE_QUIZ_BANK = [
   {
     id: 'g1',
@@ -29,22 +28,6 @@ const LINE_QUIZ_BANK = [
     options: ['1. จตุตถี หรือ ฉัฏฐีวิภัตติ', '2. ปฐมาวิภัตติ', '3. ตติยาวิภัตติ', '4. สัตตมีวิภัตติ'],
     correct: 1,
     explanation: '-สฺส เป็นวิภัตติของ จตุตถี (แก่/เพื่อ/ต่อ) และ ฉัฏฐี (แห่ง/ของ/เมื่อ)',
-  },
-  {
-    id: 'g3',
-    category: 'บาลีไวยากรณ์ (สมาส)',
-    question: 'คำสมาสว่า "มหานที" (แม่น้ำใหญ่) จัดเป็นสมาสประเภทใดในไวยากรณ์?',
-    options: ['1. วิเสสนปุพพบท กัมมธารยสมาส', '2. ตัปปุริสสมาส', '3. พหุพพีหิสมาส', '4. อัพยยีภาวสมาส'],
-    correct: 1,
-    explanation: 'มหนฺตี นที = มหานที มีบทหน้าเป็นวิเสสนะ จึงเป็น วิเสสนปุพพบท กัมมธารยสมาส',
-  },
-  {
-    id: 'g4',
-    category: 'บาลีไวยากรณ์ (สนธิ)',
-    question: 'คำว่า "เอตทโวจ" เกิดจากการสนธิศัพท์ใดในสนธิไวยากรณ์?',
-    options: ['1. เอตํ + อโวจ (นิคหิตสนธิ)', '2. เอตา + อโวจ', '3. เอโต + อโวจ', '4. เอตสฺส + อโวจ'],
-    correct: 1,
-    explanation: 'เอตํ + อโวจ -> แปลง นิคหิต (ํ) เป็น ท อาเทสนิคหิตสนธิ รวมเป็น เอตทโวจ',
   },
 ];
 
@@ -137,7 +120,7 @@ async function handleLineEvent(event) {
   await replyLineMessage(replyToken, [
     {
       type: 'text',
-      text: '🙏 เจริญพร! ยินดีต้อนรับสู่ LINE Bot คลังข้อสอบบาลีไวยากรณ์ล้วน 100% (Pali Tycoon Bot)',
+      text: '🙏 เจริญพร! ยินดีต้อนรับสู่ LINE Bot บาลีส่วนฐี (Pali Tycoon Bot)',
     },
     {
       type: 'text',
@@ -147,7 +130,7 @@ async function handleLineEvent(event) {
 }
 
 app.get('/webhook', (req, res) => {
-  res.status(200).send('Pali Tycoon LINE Webhook Server is Live!');
+  res.status(200).send('Pali Tycoon (บาลีส่วนฐี) LINE Webhook Server is Live!');
 });
 
 app.post('/webhook', (req, res) => {
@@ -160,5 +143,5 @@ app.post('/webhook', (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🚀 Pali Tycoon LINE Webhook Listening on port ${PORT}`);
+  console.log(`🚀 Pali Tycoon (บาลีส่วนฐี) LINE Webhook Listening on port ${PORT}`);
 });
