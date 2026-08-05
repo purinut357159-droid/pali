@@ -16,6 +16,25 @@ import { WinnerModal } from './components/WinnerModal';
 import { addWrongQuestionToSRS, markQuestionMastered } from './utils/srsEngine';
 import { audioManager } from './utils/audioManager';
 
+// Helper to shuffle multiple choice options & update correct answer index
+function shuffleQuestionOptions(q: Question): Question {
+  const originalCorrectText = q.options[q.correctAnswer];
+  const shuffledOptions = [...q.options];
+
+  for (let i = shuffledOptions.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffledOptions[i], shuffledOptions[j]] = [shuffledOptions[j], shuffledOptions[i]];
+  }
+
+  const newCorrectIndex = shuffledOptions.indexOf(originalCorrectText);
+
+  return {
+    ...q,
+    options: shuffledOptions,
+    correctAnswer: newCorrectIndex >= 0 ? newCorrectIndex : 0,
+  };
+}
+
 export const App: React.FC = () => {
   const [gameState, setGameState] = useState<GameState>({
     mode: 'points',
@@ -29,6 +48,7 @@ export const App: React.FC = () => {
     gameStatus: 'setup',
     logs: [],
     reviewItems: [],
+    askedQuestionIds: [],
   });
 
   const [activeQuiz, setActiveQuiz] = useState<{
@@ -91,9 +111,10 @@ export const App: React.FC = () => {
       gameStatus: 'playing',
       logs: [],
       reviewItems: [],
+      askedQuestionIds: [],
     });
 
-    addLog(`🎲 เริ่มเกมบาลีเศรษฐี (${configs.length} ผู้เล่น)! สลับผู้เล่นวนรอบอัตโนมัติ`, 'success');
+    addLog(`🎲 เริ่มเกมบาลีเศรษฐี (${configs.length} ผู้เล่น)! สุ่มคำถามและชอยส์ไม่ซ้ำ`, 'success');
   };
 
   const hasColorGroupMonopoly = (tiles: BoardTile[], playerId: string, category?: SubjectCategory): boolean => {
@@ -214,10 +235,27 @@ export const App: React.FC = () => {
       (q) => !tile.category || q.category === tile.category
     );
     const pool = categoryQuestions.length > 0 ? categoryQuestions : QUESTION_BANK;
-    const selectedQ = pool[Math.floor(Math.random() * pool.length)];
+
+    // Filter unasked questions to prevent repetition
+    let unaskedPool = pool.filter((q) => !gameState.askedQuestionIds.includes(q.id));
+
+    // Reset pool if all questions in category have been asked
+    if (unaskedPool.length === 0) {
+      unaskedPool = pool;
+    }
+
+    const rawQ = unaskedPool[Math.floor(Math.random() * unaskedPool.length)];
+    const shuffledQ = shuffleQuestionOptions(rawQ);
+
+    setGameState((prev) => ({
+      ...prev,
+      askedQuestionIds: prev.askedQuestionIds.includes(rawQ.id)
+        ? prev.askedQuestionIds
+        : [...prev.askedQuestionIds, rawQ.id],
+    }));
 
     setActiveQuiz({
-      question: selectedQ,
+      question: shuffledQ,
       title,
       targetTile: tile,
       mode,
@@ -379,7 +417,6 @@ export const App: React.FC = () => {
       addLog(`🎲 ${currentPlayer.name} ได้สิทธิ์ทอยลูกเต๋าอีกครั้ง (ลูกเต๋าออกคู่)`, 'info');
       setGameState((prev) => ({ ...prev, isDiceRolled: false }));
     } else {
-      // Transition turn to next player automatically for both Human and AI
       setTimeout(nextTurn, currentPlayer.isAi ? 1000 : 800);
     }
   };
@@ -541,6 +578,7 @@ export const App: React.FC = () => {
               <div>วิชามีเจ้าของแล้ว: {gameState.tiles.filter((t) => t.ownerId).length} / 26 วิชา</div>
               <div>คำถามในคลัง: {QUESTION_BANK.length} ข้อ</div>
               <div>คำถามทบทวนสะสม: {gameState.reviewItems.length} ข้อ</div>
+              <div>คำถามที่ถามแล้ว: {gameState.askedQuestionIds.length} / {QUESTION_BANK.length} ข้อ</div>
             </div>
           </div>
         </div>

@@ -116,6 +116,7 @@ export interface GameState {
   winner?: Player | null;
   logs: GameLog[];
   reviewItems: ReviewItem[];
+  askedQuestionIds: string[];
 }
 
 export interface GameLog {
