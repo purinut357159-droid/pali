@@ -1,32 +1,58 @@
-# React + TypeScript + Vite
+# 🎲 บาลีเศรษฐี (Pali Tycoon)
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+> เกมกระดานแนวเศรษฐี (Monopoly-inspired) สำหรับเรียนรู้ภาษาบาลี ที่เปลี่ยนจาก "การซื้อที่ดิน" เป็น "การพิชิตวิชาบาลี" พร้อมระบบ Spaced Repetition (SRS) สำหรับทบทวนศัพท์และไวยากรณ์
 
-Currently, two official plugins are available:
+![Pali Tycoon Screen](src/assets/hero.png)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+## 🎯 คอนเซ็ปต์และจุดเด่น (Key Features)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+1. **🗺️ กระดาน ๔๐ วิชาบาลี (40 Monopoly Board Tiles)**
+   - ครอบคลุมวิชาไวยากรณ์บาลีครบถ้วน: นามไวยากรณ์, อัพยยศัพท์, วิภัตติ, สนธิ, สมาส, กิตก์, ตัทธิต, พระสูตร, พระวินัย, อภิธรรม
+   - การ์ดบุญ (Boon Cards) & การ์ดกรรม (Karma Cards)
+   - สนามสอบย่อย (Midterm Exam) และสนามสอบเปรียญ (Grand Parien Exam)
 
-## Expanding the Oxlint configuration
+2. **🧠 ระบบตอบคำถาม & Spaced Repetition (SRS Engine)**
+   - คำถามบาลี 5 ระดับความยาก (⭐ ง่าย ➔ ⭐⭐⭐⭐⭐ มหาเปรียญ)
+   - เมื่อตอบผิด ข้อสอบจะถูกบันทึกลงใน **"สมุดทบทวนบาลี" (Review Notebook)** เพื่อให้นำกลับมาฝึกฝนซ้ำได้อย่างเป็นระบบ
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+3. **👤 ตัวละคร & ทักษะติดตัว (Character Passive Skills)**
+   - 🧘‍♂️ **พระภิกษุ (Monk)**: สกิล *เมตตาธรรม* (ตอบผิดครั้งแรกในแต่ละตา ไม่เสียแต้มปัญญา)
+   - 🧒 **สามเณร (Novice)**: สกิล *พากเพียร* (โบนัส EXP & แต้มปัญญา +20%)
+   - 👨‍🏫 **ครูบาลี (Teacher)**: สกิล *เชี่ยวชาญ* (มีโอกาสได้คำถามง่ายขึ้น 1 ระดับ)
+   - 🎒 **นักเรียนบาลี (Student)**: สกิล *ขยันเล่าเรียน* (โบนัสแต้มปัญญาเริ่มต้น +500 แต้ม)
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+4. **🏠 ระบบอัปเกรดสำนักเรียน**
+   - ตำรา (Base) ➔ ห้องเรียน ➔ สำนักเรียน ➔ สนามสอบ ➔ มหาวิทยาลัยบาลี
+
+5. **🎵 ระบบเสียงพากย์ & เอฟเฟกต์ (Web Audio API Synthesizer)**
+   - เสียงระฆังบาลี (Thai Temple Bell), เสียงฉลองชัย "สาธุ" (Sathu Chime), เสียงทอยลูกเต๋า
+
+---
+
+## 💻 เทคโนโลยีที่ใช้ (Tech Stack)
+
+- **Frontend**: React 19 + TypeScript + Vite
+- **Styling**: Vanilla CSS (Contemporary Thai Temple Palette - Navy `#0D1B2A` & Gold `#D4AF37`)
+- **Icons**: Lucide React
+- **Effects**: Web Audio API Sound Synthesizer & Canvas Confetti
+
+---
+
+## 🚀 วิธีการติดตั้งและเริ่มใช้งาน (Getting Started)
+
+```bash
+# 1. Clone repository
+git clone https://github.com/purinut357159-droid/pali.git
+cd pali
+
+# 2. Install dependencies
+npm install
+
+# 3. Start development server
+npm run dev
+
+# 4. Build for production
+npm run build
 ```
-
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
