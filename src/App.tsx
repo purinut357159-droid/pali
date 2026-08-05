@@ -63,6 +63,7 @@ export const App: React.FC = () => {
   const [showReviewNotebook, setShowReviewNotebook] = useState<boolean>(false);
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [rolledDoubles, setRolledDoubles] = useState<boolean>(false);
+  const [movingPlayerId, setMovingPlayerId] = useState<string | null>(null);
 
   const addLog = (text: string, type: 'info' | 'success' | 'warning' | 'danger' = 'info') => {
     const newLog = {
@@ -125,7 +126,7 @@ export const App: React.FC = () => {
   };
 
   const handleRollDice = () => {
-    if (gameState.isDiceRolled || gameState.gameStatus !== 'playing') return;
+    if (gameState.isDiceRolled || gameState.gameStatus !== 'playing' || movingPlayerId) return;
 
     audioManager.playDiceRoll();
     const d1 = Math.floor(Math.random() * 6) + 1;
@@ -181,29 +182,51 @@ export const App: React.FC = () => {
     const newPos = (oldPos + totalStep) % 40;
     const passedStart = newPos < oldPos;
 
-    setTimeout(() => {
+    setMovingPlayerId(currentPlayer.id);
+
+    // Step-by-Step Jumping Animation
+    let currentStep = 0;
+    let stepPos = oldPos;
+
+    const stepInterval = setInterval(() => {
+      currentStep += 1;
+      stepPos = (stepPos + 1) % 40;
+
+      audioManager.playDiceRoll();
+
       setGameState((prev) => {
         const updatedPlayers = [...prev.players];
         const p = updatedPlayers[prev.currentTurnPlayerIndex];
-        p.position = newPos;
-
-        if (passedStart) {
-          const passBonus = Math.round(200 * p.character.expMultiplier);
-          p.wisdomPoints += passBonus;
-
-          if (!p.hasCompletedFirstLap) {
-            p.hasCompletedFirstLap = true;
-            addLog(`🚩 ${p.name} วิ่งครบรอบแรกแล้ว! ปลดล็อกสิทธิ์การซื้อวิชาบนกระดาน`, 'success');
-          } else {
-            addLog(`${p.name} เดินผ่านจุดเริ่มต้น รับโบนัสแต้มปัญญา +${passBonus} แต้ม!`, 'success');
-          }
-        }
-
+        p.position = stepPos;
         return { ...prev, players: updatedPlayers };
       });
 
-      handleLandOnTile(newPos);
-    }, 600);
+      if (currentStep >= totalStep) {
+        clearInterval(stepInterval);
+        setMovingPlayerId(null);
+
+        setGameState((prev) => {
+          const updatedPlayers = [...prev.players];
+          const p = updatedPlayers[prev.currentTurnPlayerIndex];
+
+          if (passedStart) {
+            const passBonus = Math.round(200 * p.character.expMultiplier);
+            p.wisdomPoints += passBonus;
+
+            if (!p.hasCompletedFirstLap) {
+              p.hasCompletedFirstLap = true;
+              addLog(`🚩 ${p.name} วิ่งครบรอบแรกแล้ว! ปลดล็อกสิทธิ์การซื้อวิชาบนกระดาน`, 'success');
+            } else {
+              addLog(`${p.name} เดินผ่านจุดเริ่มต้น รับโบนัสแต้มปัญญา +${passBonus} แต้ม!`, 'success');
+            }
+          }
+
+          return { ...prev, players: updatedPlayers };
+        });
+
+        handleLandOnTile(newPos);
+      }
+    }, 180);
   };
 
   const handleLandOnTile = (tileId: number) => {
@@ -482,13 +505,13 @@ export const App: React.FC = () => {
     if (gameState.gameStatus !== 'playing') return;
     const currentPlayer = gameState.players[gameState.currentTurnPlayerIndex];
 
-    if (currentPlayer && currentPlayer.isAi && !currentPlayer.isBankrupt && !gameState.isDiceRolled && !activeQuiz && !activeEventCard && !activeTileDetail) {
+    if (currentPlayer && currentPlayer.isAi && !currentPlayer.isBankrupt && !gameState.isDiceRolled && !movingPlayerId && !activeQuiz && !activeEventCard && !activeTileDetail) {
       const timer = setTimeout(() => {
         handleRollDice();
       }, 1000);
       return () => clearTimeout(timer);
     }
-  }, [gameState.currentTurnPlayerIndex, gameState.isDiceRolled, gameState.gameStatus, activeQuiz, activeEventCard, activeTileDetail]);
+  }, [gameState.currentTurnPlayerIndex, gameState.isDiceRolled, gameState.gameStatus, movingPlayerId, activeQuiz, activeEventCard, activeTileDetail]);
 
   useEffect(() => {
     if (activeQuiz && gameState.players[gameState.currentTurnPlayerIndex]?.isAi) {
@@ -572,6 +595,7 @@ export const App: React.FC = () => {
               tiles={gameState.tiles}
               players={gameState.players}
               currentTurnPlayer={currentPlayer}
+              movingPlayerId={movingPlayerId}
               onTileClick={(tile) => setActiveTileDetail(tile)}
               onRollDice={handleRollDice}
               isDiceRolled={gameState.isDiceRolled}
@@ -674,7 +698,6 @@ export const App: React.FC = () => {
         />
       )}
 
-      {/* In-App Auto-Reply Chatbot Assistant */}
       <ChatWidget />
     </div>
   );

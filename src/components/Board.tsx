@@ -16,6 +16,7 @@ interface Props {
   tiles: BoardTile[];
   players: Player[];
   currentTurnPlayer: Player;
+  movingPlayerId?: string | null;
   onTileClick: (tile: BoardTile) => void;
   onRollDice: () => void;
   isDiceRolled: boolean;
@@ -27,6 +28,7 @@ export const Board: React.FC<Props> = ({
   tiles,
   players,
   currentTurnPlayer,
+  movingPlayerId,
   onTileClick,
   onRollDice,
   isDiceRolled,
@@ -121,7 +123,7 @@ export const Board: React.FC<Props> = ({
               {playersOnTile.map((p) => (
                 <div
                   key={p.id}
-                  className="player-token bounce-token"
+                  className={`player-token ${p.id === movingPlayerId ? 'jumping-token' : 'bounce-token'}`}
                   style={{ backgroundColor: p.color }}
                   title={p.name}
                 >
@@ -137,7 +139,7 @@ export const Board: React.FC<Props> = ({
         <div style={{ textAlign: 'center', marginBottom: '16px' }}>
           <h2 className="gold-gradient-text" style={{ fontSize: '1.3rem', marginBottom: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
             <Sparkles size={20} color="var(--primary-gold)" />
-            กระดานบาลี ๔๔ วิชา
+            กระดานบาลี ๔๐ วิชา
             <Sparkles size={20} color="var(--primary-gold)" />
           </h2>
           <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
@@ -151,7 +153,7 @@ export const Board: React.FC<Props> = ({
             dice={dice}
             isDiceRolled={isDiceRolled}
             onRollDice={onRollDice}
-            disabled={currentTurnPlayer.isAi}
+            disabled={currentTurnPlayer.isAi || !!movingPlayerId}
           />
         </div>
 
