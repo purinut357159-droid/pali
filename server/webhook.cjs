@@ -1,6 +1,6 @@
 /**
- * LINE Official Account (LINE Messaging API) Auto-Reply Engine
- * โปรเจกต์: บาลีเศรษฐี (Pali Tycoon)
+ * LINE Official Account Auto-Reply Engine
+ * ข้อมูลระบบเว็บ บาลีเศรษฐี (Pali Tycoon) ครบวงจร
  */
 
 const express = require('express');
@@ -11,7 +11,9 @@ app.use(express.json());
 
 const LINE_CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN || '';
 
-// คลังคำถามสำหรับตอบกลับผ่าน LINE OA
+const GITHUB_REPO_URL = 'https://github.com/purinut357159-droid/pali.git';
+const WEBSITE_DEMO_URL = 'http://localhost:5173/';
+
 const LINE_QUIZ_BANK = [
   {
     id: 'q1',
@@ -39,11 +41,10 @@ const LINE_QUIZ_BANK = [
   },
 ];
 
-// ฟังก์ชั่นส่งข้อความตอบกลับไปยัง LINE Messaging API (Reply Message)
 async function replyLineMessage(replyToken, messages) {
   if (!LINE_CHANNEL_ACCESS_TOKEN) {
     console.log('[LINE Bot Simulator] Reply Token:', replyToken);
-    console.log('[LINE Bot Simulator] Messages:', JSON.stringify(messages, null, 2));
+    console.log('[LINE Bot Simulator] Payload:', JSON.stringify(messages, null, 2));
     return;
   }
 
@@ -61,17 +62,16 @@ async function replyLineMessage(replyToken, messages) {
         },
       }
     );
-    console.log('Successfully sent reply to LINE User!');
   } catch (error) {
     console.error('Error replying to LINE API:', error.response?.data || error.message);
   }
 }
 
-// สร้าง Flex Message การ์ดคำถามบาลี
-function createQuizFlexMessage(q) {
+// 1. Flex Message: แนะนำเว็บ บาลีเศรษฐี
+function createWebsiteInfoFlex() {
   return {
     type: 'flex',
-    altText: `🎲 โจทย์บาลีเศรษฐี: ${q.question}`,
+    altText: '🎲 บาลีเศรษฐี (Pali Tycoon) - เกมกระดานเรียนรู้ภาษาบาลี',
     contents: {
       type: 'bubble',
       header: {
@@ -81,60 +81,74 @@ function createQuizFlexMessage(q) {
         contents: [
           {
             type: 'text',
-            text: `🎲 โจทย์บาลี [หมวด ${q.category}]`,
+            text: '🎲 บาลีเศรษฐี (Pali Tycoon)',
             weight: 'bold',
             color: '#f59e0b',
-            size: 'sm',
+            size: 'lg',
+          },
+          {
+            type: 'text',
+            text: 'เกมกระดานพิชิตวิชาบาลีเพื่อเป็นมหาเปรียญ',
+            size: 'xs',
+            color: '#94a3b8',
           },
         ],
       },
       body: {
         type: 'box',
         layout: 'vertical',
+        backgroundColor: '#0f172a',
+        spacing: 'md',
         contents: [
           {
             type: 'text',
-            text: q.question,
-            weight: 'bold',
-            size: 'md',
+            text: 'เปลี่ยนการเรียนภาษาบาลีให้สนุกเหมือนเล่นเกมเศรษฐี! ครอบครองวิชา อัปเกรดสำนักเรียน ทบทวนความรู้ด้วยระบบ Spaced Repetition (SRS)',
             wrap: true,
-            color: '#ffffff',
+            color: '#e2e8f0',
+            size: 'sm',
           },
           {
             type: 'separator',
-            margin: 'md',
             color: '#d4af37',
           },
           {
             type: 'box',
             layout: 'vertical',
-            margin: 'md',
-            spacing: 'sm',
-            contents: q.options.map((opt, idx) => ({
-              type: 'button',
-              style: 'secondary',
-              height: 'sm',
-              action: {
-                type: 'message',
-                label: opt,
-                text: `ตอบข้อ ${idx + 1}`,
-              },
-            })),
+            spacing: 'xs',
+            contents: [
+              { type: 'text', text: '⭐ **จุดเด่นในเว็บของเรา**:', color: '#f59e0b', size: 'xs', weight: 'bold' },
+              { type: 'text', text: '• กระดาน 40 ช่อง ครอบคลุม 9 หมวดวิชาบาลี', color: '#cbd5e1', size: 'xs' },
+              { type: 'text', text: '• ระบบ AI เล่นสู้ และรองรับเล่นได้หลายคน (Pass & Play)', color: '#cbd5e1', size: 'xs' },
+              { type: 'text', text: '• สมุดทบทวนข้อผิดพลาดระบบ SRS ทบทวนซ้ำอัตโนมัติ', color: '#cbd5e1', size: 'xs' },
+              { type: 'text', text: '• ระบบเสียงบทสวด เอฟเฟกต์ระฆังวัดและเสียงทอยเต๋า', color: '#cbd5e1', size: 'xs' },
+            ],
           },
         ],
-        backgroundColor: '#0f172a',
       },
       footer: {
         type: 'box',
         layout: 'vertical',
         backgroundColor: '#162544',
+        spacing: 'sm',
         contents: [
           {
-            type: 'text',
-            text: 'พิมพ์ "สุ่มคำถาม" เพื่อเปลี่ยนโจทย์ใหม่',
-            size: 'xs',
-            color: '#94a3b8',
-            align: 'center',
+            type: 'button',
+            style: 'primary',
+            color: '#d4af37',
+            action: {
+              type: 'uri',
+              label: '🌐 เข้าเล่นบนเว็บไซต์ (GitHub)',
+              uri: GITHUB_REPO_URL,
+            },
+          },
+          {
+            type: 'button',
+            style: 'secondary',
+            action: {
+              type: 'message',
+              label: '🎲 สุ่มโจทย์คำถามบาลี',
+              text: 'สุ่มคำถาม',
+            },
           },
         ],
       },
@@ -142,7 +156,38 @@ function createQuizFlexMessage(q) {
   };
 }
 
-// ประมวลผลข้อความและส่งคำตอบกลับ
+// 2. Flex Message: ข้อมูลตัวละครและอาชีพ
+function createCharactersFlex() {
+  return {
+    type: 'flex',
+    altText: '👥 ข้อมูลตัวละครและอาชีพในเกมบาลีเศรษฐี',
+    contents: {
+      type: 'bubble',
+      header: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: '#162544',
+        contents: [
+          { type: 'text', text: '👥 ตัวละครและสกิลประจำอาชีพ', weight: 'bold', color: '#f59e0b', size: 'md' },
+        ],
+      },
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        backgroundColor: '#0f172a',
+        spacing: 'sm',
+        contents: [
+          { type: 'text', text: '🧘‍♂️ **พระภิกษุ**: สกิล "เมตตาธรรม" (โบนัสแต้มปัญญาเริ่มต้น +500)', color: '#e2e8f0', size: 'xs', wrap: true },
+          { type: 'text', text: '👦 **สามเณร**: สกิล "ขยันเรียน" (โบนัส EXP x1.5 ทุกครั้งที่ผ่านจุดเริ่มต้น)', color: '#e2e8f0', size: 'xs', wrap: true },
+          { type: 'text', text: '👨‍🏫 **อาจารย์บาลี**: สกิล "รอบรู้ตำรา" (ตอบโจทย์ง่ายได้โบนัสคูณ 2)', color: '#e2e8f0', size: 'xs', wrap: true },
+          { type: 'text', text: '🎓 **นักเรียนบาลี**: สกิล "ท่องจำเก่ง" (ตอบผิดครั้งแรกฟรี ไม่เสียแต้ม)', color: '#e2e8f0', size: 'xs', wrap: true },
+        ],
+      },
+    },
+  };
+}
+
+// ประมวลผลข้อความและส่งตอบกลับ
 async function handleLineEvent(event) {
   if (event.type !== 'message' || event.message.type !== 'text') {
     return;
@@ -151,13 +196,59 @@ async function handleLineEvent(event) {
   const text = event.message.text.trim();
   const replyToken = event.replyToken;
 
-  if (text.includes('บาลี') || text.includes('สุ่มคำถาม') || text.includes('เริ่มเล่น') || text.includes('โจทย์')) {
-    const q = LINE_QUIZ_BANK[Math.floor(Math.random() * LINE_QUIZ_BANK.length)];
-    const flexMsg = createQuizFlexMessage(q);
-    await replyLineMessage(replyToken, flexMsg);
+  // 1. เกี่ยวกับเว็บ / บาลีเศรษฐี
+  if (text.includes('เว็บ') || text.includes('เกี่ยวกับ') || text.includes('เกม') || text.includes('บาลีเศรษฐี')) {
+    await replyLineMessage(replyToken, createWebsiteInfoFlex());
     return;
   }
 
+  // 2. ตัวละคร / อาชีพ / สกิล
+  if (text.includes('ตัวละคร') || text.includes('อาชีพ') || text.includes('สกิล')) {
+    await replyLineMessage(replyToken, createCharactersFlex());
+    return;
+  }
+
+  // 3. สุ่มคำถาม
+  if (text.includes('บาลี') || text.includes('สุ่มคำถาม') || text.includes('เริ่มเล่น') || text.includes('โจทย์')) {
+    const q = LINE_QUIZ_BANK[Math.floor(Math.random() * LINE_QUIZ_BANK.length)];
+    await replyLineMessage(replyToken, {
+      type: 'flex',
+      altText: `🎲 โจทย์บาลีเศรษฐี: ${q.question}`,
+      contents: {
+        type: 'bubble',
+        header: {
+          type: 'box',
+          layout: 'vertical',
+          backgroundColor: '#162544',
+          contents: [{ type: 'text', text: `🎲 โจทย์บาลี [หมวด ${q.category}]`, weight: 'bold', color: '#f59e0b', size: 'sm' }],
+        },
+        body: {
+          type: 'box',
+          layout: 'vertical',
+          backgroundColor: '#0f172a',
+          contents: [
+            { type: 'text', text: q.question, weight: 'bold', size: 'md', wrap: true, color: '#ffffff' },
+            { type: 'separator', margin: 'md', color: '#d4af37' },
+            {
+              type: 'box',
+              layout: 'vertical',
+              margin: 'md',
+              spacing: 'sm',
+              contents: q.options.map((opt, idx) => ({
+                type: 'button',
+                style: 'secondary',
+                height: 'sm',
+                action: { type: 'message', label: opt, text: `ตอบข้อ ${idx + 1}` },
+              })),
+            },
+          ],
+        },
+      },
+    });
+    return;
+  }
+
+  // 4. ตรวจคำตอบ
   if (text.startsWith('ตอบข้อ')) {
     const choiceNum = parseInt(text.replace('ตอบข้อ', '').trim());
     if (choiceNum === 1) {
@@ -174,39 +265,38 @@ async function handleLineEvent(event) {
     return;
   }
 
+  // 5. กฎกติกา
   if (text.includes('กฎ') || text.includes('กติกา') || text.includes('วิธีเล่น')) {
     await replyLineMessage(replyToken, {
       type: 'text',
-      text: '🎲 กฎการเล่นเกม บาลีเศรษฐี (Pali Tycoon):\n\n1. ทอยลูกเต๋า 40 ช่องรอบกระดานวิชาบาลี\n2. ต้องเดินครบรอบ 1 ก่อนจึงจะเริ่มซื้อวิชาได้\n3. ตอบคำถามถูกเพื่อครอบครองวิชา หรือรับส่วนลดค่าผ่านทาง 50%\n4. ทอยได้เต๋าคู่ (Doubles) จะได้ทอยซ้ำ\n5. เล่นผ่านเว็บได้ที่: https://github.com/purinut357159-droid/pali.git',
+      text: `🎲 กฎการเล่นเกม บาลีเศรษฐี (Pali Tycoon):\n\n1. ทอยลูกเต๋า 40 ช่องรอบกระดานวิชาบาลี\n2. ต้องเดินครบรอบ 1 ก่อนจึงจะเริ่มซื้อวิชาได้\n3. ตอบคำถามถูกเพื่อซื้อวิชา หรือลดค่าผ่านทาง 50%\n4. ทอยได้เต๋าคู่ (Doubles) ได้สิทธิ์ทอยซ้ำ\n5. ตอบผิดข้อสอบจะถูกบันทึกลง "สมุดทบทวน" ให้ฝึกฝนซ้ำแบบ SRS\n\nดูซอร์สโค้ดและวิธีเล่นได้ที่: ${GITHUB_REPO_URL}`,
     });
     return;
   }
 
-  // Default Greeting / Menu
+  // 6. เมนูต้อนรับ / Default Help
   await replyLineMessage(replyToken, [
     {
       type: 'text',
-      text: '🙏 เจริญพร! ยินดีต้อนรับสู่ LINE Official Account: บาลีเศรษฐี (Pali Tycoon Bot)\n\nระบบตอบกลับอัตโนมัติพร้อมทดสอบความรู้ภาษาบาลีของคุณ!',
+      text: '🙏 เจริญพร! ยินดีต้อนรับสู่ LINE Official Account ของ บาลีเศรษฐี (Pali Tycoon Bot)\n\nระบบตอบกลับข้อมูลเว็บไซต์และโจทย์คำถามบาลีอัตโนมัติ!',
     },
     {
       type: 'text',
-      text: 'เลือกทำรายการได้เลยครับ:\n• พิมพ์ "สุ่มคำถาม" ➔ ทดสอบโจทย์บาลี\n• พิมพ์ "กฎ" ➔ กติกาการเล่นบาลีเศรษฐี\n• พิมพ์ "วิภัตติ" ➔ ดูเกร็ดความรู้วิภัตติ',
+      text: 'พิมพ์คำเพื่อสอบถามข้อมูลได้เลยครับ:\n• พิมพ์ "เว็บ" ➔ ดูรายละเอียดจุดเด่นของเว็บเรา\n• พิมพ์ "ตัวละคร" ➔ ดูอาชีพและสกิลพิเศษ\n• พิมพ์ "สุ่มคำถาม" ➔ ทำโจทย์บาลีพร้อมเฉลย\n• พิมพ์ "กฎ" ➔ ดูกฎกติกาการเล่นเกม',
     },
   ]);
 }
 
-// Webhook Endpoints
+// Endpoints
 app.get('/webhook', (req, res) => {
-  res.status(200).send('Pali Tycoon LINE Webhook & Auto-Reply Engine Active!');
+  res.status(200).send('Pali Tycoon LINE Webhook & Website Info Auto-Reply Engine Active!');
 });
 
 app.post('/webhook', (req, res) => {
   const events = req.body.events || [];
-
   events.forEach((event) => {
     handleLineEvent(event).catch(console.error);
   });
-
   res.status(200).json({ status: 'success', processedEvents: events.length });
 });
 
