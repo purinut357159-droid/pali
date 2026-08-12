@@ -41,13 +41,13 @@ export const BOARD_TILES: BoardTile[] = [
     icon: '📖',
     color: '#3b82f6',
   },
-  // Tile 4: สอบย่อย
+  // Tile 4: ติวเพิ่มเติม
   {
     id: 4,
-    name: 'สอบย่อย 1',
+    name: 'ติวเพิ่มเติม 1',
     type: 'quiz',
-    description: 'ตอบคำถามสุ่มเพื่อรับแต้มปัญญาพิเศษ',
-    icon: '✍️',
+    description: 'ห้องติวบาลีเพิ่มเติม (หากตอบผิดสะสมครบ 3 ข้อ จะต้องหยุดเดิน 1 ตา)',
+    icon: '👨‍🏫',
     color: '#eab308',
   },
   // Tile 5-9: วิภัตติ
@@ -154,13 +154,13 @@ export const BOARD_TILES: BoardTile[] = [
     icon: '🔗',
     color: '#8b5cf6',
   },
-  // Tile 15: สอบย่อย
+  // Tile 15: ติวเพิ่มเติม
   {
     id: 15,
-    name: 'สอบย่อย 2',
+    name: 'ติวเพิ่มเติม 2',
     type: 'quiz',
-    description: 'ตอบคำถามสุ่มเพื่อรับแต้มปัญญาพิเศษ',
-    icon: '✍️',
+    description: 'ห้องติวบาลีเพิ่มเติม (หากตอบผิดสะสมครบ 3 ข้อ จะต้องหยุดเดิน 1 ตา)',
+    icon: '👨‍🏫',
     color: '#eab308',
   },
   // Tile 16-19: สมาส
@@ -205,12 +205,12 @@ export const BOARD_TILES: BoardTile[] = [
     icon: '🧩',
     color: '#ec4899',
   },
-  // Tile 20: สนามสอบย่อย (Corner)
+  // Tile 20: สนามติวเข้มพิเศษ (Corner)
   {
     id: 20,
-    name: 'สนามสอบย่อย',
+    name: 'สนามติวเข้มพิเศษ',
     type: 'exam',
-    description: 'สนามสอบวัดความรู้ระดับกลาง',
+    description: 'สนามสอบติวเข้มวัดความรู้ระดับกลาง',
     icon: '🏛️',
     color: '#f97316',
   },
@@ -256,13 +256,13 @@ export const BOARD_TILES: BoardTile[] = [
     icon: '🔮',
     color: '#f43f5e',
   },
-  // Tile 25: สอบย่อย
+  // Tile 25: ติวเพิ่มเติม
   {
     id: 25,
-    name: 'สอบย่อย 3',
+    name: 'ติวเพิ่มเติม 3',
     type: 'quiz',
-    description: 'ตอบคำถามสุ่มเพื่อรับแต้มปัญญาพิเศษ',
-    icon: '✍️',
+    description: 'ห้องติวบาลีเพิ่มเติม (หากตอบผิดสะสมครบ 3 ข้อ จะต้องหยุดเดิน 1 ตา)',
+    icon: '👨‍🏫',
     color: '#eab308',
   },
   // Tile 26-29: ตัทธิต & พระสูตร
@@ -358,13 +358,13 @@ export const BOARD_TILES: BoardTile[] = [
     icon: '⚖️',
     color: '#10b981',
   },
-  // Tile 35: สอบย่อย
+  // Tile 35: ติวเพิ่มเติม
   {
     id: 35,
-    name: 'สอบย่อย 4',
+    name: 'ติวเพิ่มเติม 4',
     type: 'quiz',
-    description: 'ตอบคำถามสุ่มเพื่อรับแต้มปัญญาพิเศษ',
-    icon: '✍️',
+    description: 'ห้องติวบาลีเพิ่มเติม (หากตอบผิดสะสมครบ 3 ข้อ จะต้องหยุดเดิน 1 ตา)',
+    icon: '👨‍🏫',
     color: '#eab308',
   },
   // Tile 36-39: อภิธรรม

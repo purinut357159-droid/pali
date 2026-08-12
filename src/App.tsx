@@ -25,7 +25,7 @@ import {
   recordMatchResult,
   syncUserReviewDeck,
 } from './utils/authService';
-import { checkPropertyCombo } from './utils/comboEngine';
+import { checkPropertyCombo, UPGRADE_NAMES } from './utils/comboEngine';
 
 function shuffleQuestionOptions(q: Question): Question {
   const originalCorrectText = q.options[q.correctAnswer];
@@ -72,7 +72,7 @@ export const App: React.FC = () => {
     question: Question;
     title: string;
     targetTile?: BoardTile;
-    mode: 'buy' | 'rent' | 'quiz' | 'exam';
+    mode: 'buy' | 'rent' | 'quiz' | 'exam' | 'upgrade';
   } | null>(null);
 
   const [activeTileDetail, setActiveTileDetail] = useState<BoardTile | null>(null);
@@ -122,6 +122,7 @@ export const App: React.FC = () => {
       isBankrupt: false,
       hasCompletedFirstLap: false,
       doublesStreak: 0,
+      tutoringWrongCount: 0,
       freeAnswerCards: cfg.character.id === 'student' ? 1 : 0,
       ownedProperties: [],
       exp: 0,
@@ -317,12 +318,36 @@ export const App: React.FC = () => {
         if (!currentPlayer.hasCompletedFirstLap) {
           addLog(`🚫 ${currentPlayer.name} ยังวิ่งไม่ครบ 1 รอบแรก! ไม่สามารถซื้อวิชา "${tile.name}" ได้`, 'warning');
           finishTurnCheck();
+        } else if (currentPlayer.wisdomPoints < (tile.price || 0)) {
+          addLog(`💸 ${currentPlayer.name} มีแต้มปัญญาไม่พอซื้อวิชา "${tile.name}" (ต้องการ ${tile.price} แต้ม)`, 'warning');
+          finishTurnCheck();
         } else {
-          triggerQuestion(tile, 'buy', `ทดสอบความรู้เพื่อซื้อวิชา "${tile.name}"`);
+          if (currentPlayer.isAi) {
+            if (currentPlayer.wisdomPoints >= (tile.price || 0) + 200) {
+              addLog(`🤖 ${currentPlayer.name} ตัดสินใจตอบคำถามเพื่อซื้อวิชา "${tile.name}" (ราคา ${tile.price} แต้ม)`, 'info');
+              triggerQuestion(tile, 'buy', `ตอบคำถามบาลีเพื่อซื้อวิชา "${tile.name}" (ราคา ${tile.price} แต้ม)`);
+            } else {
+              addLog(`🤖 ${currentPlayer.name} เลือกไม่ซื้อวิชา "${tile.name}" เพื่อเก็บแต้มปัญญาไว้`, 'info');
+              finishTurnCheck();
+            }
+          } else {
+            addLog(`📖 ${currentPlayer.name} ตกช่องวิชา "${tile.name}" เลือกว่าจะซื้อวิชาหรือไม่`, 'info');
+            setActiveTileDetail(tile);
+          }
         }
       } else if (owner.id === currentPlayer.id) {
         addLog(`${currentPlayer.name} ตกเมืองวิชาของตนเอง (${tile.name})`, 'info');
-        setActiveTileDetail(tile);
+        if (currentPlayer.isAi) {
+          const canUpgrade = tile.upgradeLevel !== undefined && tile.upgradeLevel < 4 && tile.upgradeCost && currentPlayer.wisdomPoints >= tile.upgradeCost + 200;
+          if (canUpgrade) {
+            addLog(`🤖 ${currentPlayer.name} ตัดสินใจตอบคำถามเพื่ออัปเกรดวิชา "${tile.name}" (ราคา ${tile.upgradeCost} แต้ม)`, 'info');
+            triggerQuestion(tile, 'upgrade', `ตอบคำถามบาลีเพื่ออัปเกรดสำนักเรียน "${tile.name}"`);
+          } else {
+            finishTurnCheck();
+          }
+        } else {
+          setActiveTileDetail(tile);
+        }
       } else {
         const combo = checkPropertyCombo(gameState.tiles, tile, owner.id);
         const comboTag = combo.hasCombo ? ` 🔥(คอมโบ x${combo.multiplier}!)` : '';
@@ -335,7 +360,9 @@ export const App: React.FC = () => {
       const card = KARMA_CARDS[Math.floor(Math.random() * KARMA_CARDS.length)];
       applyCardEffect(card, currentPlayer);
     } else if (tile.type === 'quiz') {
-      triggerQuestion(tile, 'quiz', 'ช่องสอบย่อย! ตอบถูกรับแต้มปัญญา +150 แต้ม');
+      const wrongCount = currentPlayer.tutoringWrongCount || 0;
+      addLog(`👨‍🏫 ${currentPlayer.name} เข้าห้องติวบาลีเพิ่มเติม: "${tile.name}" (ตอบผิดสะสม: ${wrongCount}/3 ข้อ)`, 'info');
+      triggerQuestion(tile, 'quiz', `ห้องติวเพิ่มเติม: "${tile.name}" (ตอบผิดสะสม ${wrongCount}/3 ข้อ)`);
     } else if (tile.type === 'exam') {
       triggerQuestion(tile, 'exam', 'สนามสอบเปรียญ! ตอบถูกรับโบนัสใหญ่ +300 แต้ม');
     } else if (tile.type === 'goto_jail') {
@@ -361,7 +388,7 @@ export const App: React.FC = () => {
     }
   };
 
-  const triggerQuestion = (tile: BoardTile, mode: 'buy' | 'rent' | 'quiz' | 'exam', title: string) => {
+  const triggerQuestion = (tile: BoardTile, mode: 'buy' | 'rent' | 'quiz' | 'exam' | 'upgrade', title: string) => {
     const categoryQuestions = QUESTION_BANK.filter(
       (q) => !tile.category || q.category === tile.category
     );
@@ -424,19 +451,28 @@ export const App: React.FC = () => {
         p.stats.correctAnswers += 1;
 
         if (mode === 'buy' && targetTile && targetTile.price && p.wisdomPoints >= targetTile.price) {
-          p.wisdomPoints = p.wisdomPoints - targetTile.price + speedBonus;
+          p.wisdomPoints = p.wisdomPoints - targetTile.price; // Deduct price only, no wisdom bonus
           p.ownedProperties.push(targetTile.id);
           p.stats.propertiesBought += 1;
 
           const updatedTiles = prev.tiles.map((t) =>
             t.id === targetTile.id ? { ...t, ownerId: p.id, upgradeLevel: 0 as const } : t
           );
-          
-          if (speedBonus > 0) {
-            addLog(`✨ ${p.name} ตอบถูกใน ${timeTaken > 0 ? timeTaken.toFixed(1) + ' วิ' : 'เวลาจำกัด'}! รับโบนัสความเร็ว +${speedBonus} แต้มปัญญา และครอบครองวิชา "${targetTile.name}" สำเร็จ!`, 'success');
-          } else {
-            addLog(`${p.name} ครอบครองวิชา "${targetTile.name}" สำเร็จ!`, 'success');
-          }
+
+          audioManager.playUpgradeSound();
+          addLog(`✨ ${p.name} ตอบคำถามบาลีถูกต้อง! จ่าย ${targetTile.price} แต้มปัญญา และได้รับกรรมสิทธิ์ครอบครองวิชา "${targetTile.name}" สำเร็จ!`, 'success');
+          return { ...prev, players: updatedPlayers, tiles: updatedTiles };
+        } else if (mode === 'upgrade' && targetTile) {
+          const cost = targetTile.upgradeCost || 0;
+          p.wisdomPoints = Math.max(0, p.wisdomPoints - cost); // Deduct upgrade cost only
+          const nextLevel = Math.min(4, ((targetTile.upgradeLevel ?? 0) + 1)) as any;
+
+          const updatedTiles = prev.tiles.map((t) =>
+            t.id === targetTile.id ? { ...t, upgradeLevel: nextLevel } : t
+          );
+
+          audioManager.playUpgradeSound();
+          addLog(`✨ ${p.name} ตอบคำถามบาลีถูกต้อง! จ่าย ${cost} แต้มปัญญา และอัปเกรดวิชา "${targetTile.name}" เป็น "${UPGRADE_NAMES[nextLevel]}" สำเร็จ!`, 'success');
           return { ...prev, players: updatedPlayers, tiles: updatedTiles };
         } else if (mode === 'rent' && targetTile) {
           const owner = prev.players.find((item) => item.id === targetTile.ownerId);
@@ -450,29 +486,50 @@ export const App: React.FC = () => {
             }
 
             const discountedRent = Math.floor(baseRent * 0.5);
-            p.wisdomPoints = p.wisdomPoints - discountedRent + speedBonus;
+            p.wisdomPoints = p.wisdomPoints - discountedRent;
             owner.wisdomPoints += discountedRent;
 
-            if (speedBonus > 0) {
-              addLog(`✨ ${p.name} ตอบถูกใน ${timeTaken > 0 ? timeTaken.toFixed(1) + ' วิ' : 'เวลาจำกัด'}! ได้รับโบนัสความเร็ว +${speedBonus} แต้มปัญญา และจ่ายค่าผ่านทางเพียงครึ่งเดียว (${discountedRent} แต้ม)`, 'info');
-            } else {
-              addLog(`${p.name} ตอบถูก! จ่ายค่าผ่านทางเพียงครึ่งเดียว (${discountedRent} แต้ม)`, 'info');
-            }
+            addLog(`✨ ${p.name} ตอบคำถามบาลีถูกต้อง! ได้รับส่วนลดจ่ายค่าผ่านทางเพียงครึ่งเดียว (${discountedRent} แต้ม)`, 'info');
           }
-        } else if (mode === 'quiz' || mode === 'exam') {
-          const baseReward = mode === 'exam' ? 300 : 150;
-          const totalReward = baseReward + speedBonus;
+        } else if (mode === 'quiz') {
+          const totalReward = 150 + speedBonus;
           p.wisdomPoints += totalReward;
-          if (mode === 'exam') p.stats.examsPassed += 1;
-
+          audioManager.playSathuChime();
           if (speedBonus > 0) {
-            addLog(`🏆 ${p.name} ตอบคำถามสำเร็จใน ${timeTaken > 0 ? timeTaken.toFixed(1) + ' วิ' : 'เวลาจำกัด'}! รับแต้มปัญญาฐาน +${baseReward} และโบนัสความเร็ว +${speedBonus} (รวม +${totalReward} แต้ม)!`, 'success');
+            addLog(`🏆 ${p.name} ตอบถูกในห้องติวเพิ่มเติม (${timeTaken > 0 ? timeTaken.toFixed(1) + ' วิ' : 'เวลาจำกัด'})! รับโบนัสแต้มปัญญา +${totalReward} แต้ม!`, 'success');
           } else {
-            addLog(`${p.name} ผ่านการสอบ รับโบนัสแต้มปัญญา +${totalReward} แต้ม!`, 'success');
+            addLog(`✨ ${p.name} ตอบถูกในห้องติวเพิ่มเติม! รับโบนัสแต้มปัญญา +${totalReward} แต้ม!`, 'success');
+          }
+        } else if (mode === 'exam') {
+          const totalReward = 300 + speedBonus;
+          p.wisdomPoints += totalReward;
+          p.stats.examsPassed += 1;
+          audioManager.playSathuChime();
+          if (speedBonus > 0) {
+            addLog(`🏆 ${p.name} ผ่านสนามสอบเปรียญ (${timeTaken > 0 ? timeTaken.toFixed(1) + ' วิ' : 'เวลาจำกัด'})! รับโบนัสใหญ่ +${totalReward} แต้ม!`, 'success');
+          } else {
+            addLog(`✨ ${p.name} ผ่านสนามสอบเปรียญ! รับโบนัสแต้มปัญญา +${totalReward} แต้ม!`, 'success');
           }
         }
       } else {
-        addLog(`${p.name} ตอบคำถามบาลีไม่ถูกต้อง หรือหมดเวลา`, 'danger');
+        if (mode === 'buy' && targetTile) {
+          addLog(`❌ ${p.name} ตอบคำถามบาลีไม่ถูกต้อง! จึงไม่ได้รับสิทธิ์ครอบครองวิชา "${targetTile.name}" (ไม่เสียแต้มซื้อ)`, 'danger');
+        } else if (mode === 'upgrade' && targetTile) {
+          addLog(`❌ ${p.name} ตอบคำถามบาลีไม่ถูกต้อง! จึงไม่สามารถอัปเกรดวิชา "${targetTile.name}" ได้ (ไม่เสียแต้มอัปเกรด)`, 'danger');
+        } else if (mode === 'quiz') {
+          p.tutoringWrongCount = (p.tutoringWrongCount || 0) + 1;
+          if (p.tutoringWrongCount >= 3) {
+            p.isSkipTurn = true;
+            p.tutoringWrongCount = 0;
+            audioManager.playJailSound();
+            addLog(`🚨 ${p.name} ตอบคำถามในห้องติวเพิ่มเติมผิดสะสมครบ 3 ข้อ! ถูกสั่งให้อยู่ติวเข้มซ่อมเสริม หยุดพักการเดิน 1 ตา!`, 'danger');
+          } else {
+            addLog(`❌ ${p.name} ตอบผิดในห้องติวเพิ่มเติม (สะสมผิด ${p.tutoringWrongCount}/3 ข้อ - หากผิดครบ 3 ข้อจะหยุดเดิน 1 ตา)`, 'warning');
+          }
+        } else {
+          addLog(`${p.name} ตอบคำถามบาลีไม่ถูกต้อง หรือหมดเวลา`, 'danger');
+        }
+
         newReviewItems = addWrongQuestionToSRS(prev.reviewItems, question);
 
         if (currentUser) {
@@ -782,6 +839,7 @@ export const App: React.FC = () => {
           question={activeQuiz.question}
           player={currentPlayer}
           title={activeQuiz.title}
+          mode={activeQuiz.mode}
           onAnswer={handleAnswerQuiz}
           canUseFreeCard={currentPlayer.freeAnswerCards > 0}
           onUseFreeCard={() => handleAnswerQuiz(true, 150, 0.5)}
@@ -801,18 +859,13 @@ export const App: React.FC = () => {
             }
           }}
           isCurrentPlayerOnTile={currentPlayer.position === activeTileDetail.id}
+          onBuy={(tile) => {
+            setActiveTileDetail(null);
+            triggerQuestion(tile, 'buy', `ตอบคำถามบาลีเพื่อซื้อวิชา "${tile.name}" (ราคา ${tile.price} แต้ม)`);
+          }}
           onUpgrade={(tile) => {
-            setGameState((prev) => {
-              const updatedTiles = prev.tiles.map((t) =>
-                t.id === tile.id ? { ...t, upgradeLevel: Math.min(4, (t.upgradeLevel || 0) + 1) as any } : t
-              );
-              const updatedPlayers = [...prev.players];
-              const p = updatedPlayers[prev.currentTurnPlayerIndex];
-              if (tile.upgradeCost) p.wisdomPoints -= tile.upgradeCost;
-              addLog(`${p.name} อัปเกรดวิชา "${tile.name}" สำเร็จ!`, 'success');
-              return { ...prev, tiles: updatedTiles, players: updatedPlayers };
-            });
-            finishTurnCheck();
+            setActiveTileDetail(null);
+            triggerQuestion(tile, 'upgrade', `ตอบคำถามบาลีเพื่ออัปเกรดสำนักเรียน "${tile.name}" (ราคา ${tile.upgradeCost} แต้ม)`);
           }}
           onSell={handleSellProperty}
           onTakeover={(tile) => {

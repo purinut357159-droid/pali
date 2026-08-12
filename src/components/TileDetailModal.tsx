@@ -192,32 +192,49 @@ export const TileDetailModal: React.FC<Props> = ({
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '16px' }}>
           {canBuy && onBuy && (
-            <button
-              onClick={() => {
-                onBuy(tile);
-                onClose();
-              }}
-              className="gold-button"
-              style={{ justifyContent: 'center' }}
-            >
-              <ShoppingBag size={18} />
-              ซื้อวิชา (💡 {tile.price} แต้ม)
-            </button>
+            <>
+              <button
+                onClick={() => {
+                  onBuy(tile);
+                  onClose();
+                }}
+                className="gold-button"
+                style={{ justifyContent: 'center', fontSize: '0.95rem', padding: '12px' }}
+              >
+                <ShoppingBag size={18} />
+                📖 จ่าย 💡 {tile.price} แต้ม & ตอบคำถามเพื่อซื้อวิชา
+              </button>
+              <button
+                onClick={onClose}
+                className="secondary-button"
+                style={{ justifyContent: 'center', padding: '8px' }}
+              >
+                ⏭️ ไม่ซื้อ (ผ่านตานี้)
+              </button>
+            </>
           )}
 
           {canUpgrade && onUpgrade && (
-            <button
-              onClick={() => {
-                onUpgrade(tile);
-                audioManager.playUpgradeSound();
-                onClose();
-              }}
-              className="gold-button"
-              style={{ justifyContent: 'center' }}
-            >
-              <ArrowUpCircle size={18} />
-              อัปเกรดเป็น {upgradeNames[(tile.upgradeLevel || 0) + 1]} (💡 {tile.upgradeCost} แต้ม)
-            </button>
+            <>
+              <button
+                onClick={() => {
+                  onUpgrade(tile);
+                  onClose();
+                }}
+                className="gold-button"
+                style={{ justifyContent: 'center', fontSize: '0.95rem', padding: '12px' }}
+              >
+                <ArrowUpCircle size={18} />
+                🏫 จ่าย 💡 {tile.upgradeCost} แต้ม & ตอบคำถามเพื่ออัปเกรด ({upgradeNames[(tile.upgradeLevel || 0) + 1]})
+              </button>
+              <button
+                onClick={onClose}
+                className="secondary-button"
+                style={{ justifyContent: 'center', padding: '8px' }}
+              >
+                ⏭️ ไม่ต้องการอัปเกรด (ผ่าน)
+              </button>
+            </>
           )}
 
           {canTakeover && onTakeover && (

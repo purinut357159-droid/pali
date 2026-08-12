@@ -99,6 +99,44 @@ export const PlayerCard: React.FC<Props> = ({ player, isCurrentTurn }) => {
         <span>{player.hasCompletedFirstLap ? 'ปลดล็อกซื้อวิชาแล้ว (ผ่านรอบ 1)' : 'ยังไม่ครบรอบ 1 (ซื้อวิชาไม่ได้)'}</span>
       </div>
 
+      {player.isSkipTurn && (
+        <div
+          style={{
+            fontSize: '0.68rem',
+            padding: '3px 6px',
+            borderRadius: '6px',
+            background: 'rgba(239, 68, 68, 0.2)',
+            border: '1px solid #ef4444',
+            color: '#f87171',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            marginBottom: '6px',
+          }}
+        >
+          <span>🛑 ติดภารกิจ (หยุดเดิน 1 ตา)</span>
+        </div>
+      )}
+
+      {player.tutoringWrongCount > 0 && !player.isSkipTurn && (
+        <div
+          style={{
+            fontSize: '0.68rem',
+            padding: '3px 6px',
+            borderRadius: '6px',
+            background: 'rgba(245, 158, 11, 0.15)',
+            border: '1px solid #f59e0b',
+            color: '#fbbf24',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+            marginBottom: '6px',
+          }}
+        >
+          <span>👨‍🏫 ติวผิดสะสม: {player.tutoringWrongCount}/3 ข้อ</span>
+        </div>
+      )}
+
       <div
         style={{
           fontSize: '0.65rem',

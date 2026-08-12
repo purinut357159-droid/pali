@@ -79,6 +79,7 @@ export interface Player {
   isBankrupt: boolean;
   hasCompletedFirstLap: boolean;
   doublesStreak: number;
+  tutoringWrongCount: number;
   freeAnswerCards: number;
   ownedProperties: number[]; // Tile IDs
   exp: number;
