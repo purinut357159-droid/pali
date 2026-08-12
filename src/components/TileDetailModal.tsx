@@ -194,10 +194,7 @@ export const TileDetailModal: React.FC<Props> = ({
           {canBuy && onBuy && (
             <>
               <button
-                onClick={() => {
-                  onBuy(tile);
-                  onClose();
-                }}
+                onClick={() => onBuy(tile)}
                 className="gold-button"
                 style={{ justifyContent: 'center', fontSize: '0.95rem', padding: '12px' }}
               >
@@ -217,10 +214,7 @@ export const TileDetailModal: React.FC<Props> = ({
           {canUpgrade && onUpgrade && (
             <>
               <button
-                onClick={() => {
-                  onUpgrade(tile);
-                  onClose();
-                }}
+                onClick={() => onUpgrade(tile)}
                 className="gold-button"
                 style={{ justifyContent: 'center', fontSize: '0.95rem', padding: '12px' }}
               >
@@ -242,7 +236,6 @@ export const TileDetailModal: React.FC<Props> = ({
               onClick={() => {
                 onTakeover(tile);
                 audioManager.playUpgradeSound();
-                onClose();
               }}
               className="gold-button"
               style={{ justifyContent: 'center', background: 'linear-gradient(135deg, #a855f7, #ec4899)' }}
@@ -254,10 +247,7 @@ export const TileDetailModal: React.FC<Props> = ({
 
           {canSell && onSell && (
             <button
-              onClick={() => {
-                onSell(tile);
-                onClose();
-              }}
+              onClick={() => onSell(tile)}
               className="secondary-button"
               style={{ justifyContent: 'center', display: 'flex', alignItems: 'center', gap: '8px', color: '#f87171', borderColor: 'rgba(239,68,68,0.4)' }}
             >

@@ -43,6 +43,29 @@ export const QuizModal: React.FC<Props> = ({
 
   const currentLiveBonus = calculateSpeedBonus(timeLeft);
 
+  // AI auto-answer simulation
+  useEffect(() => {
+    if (!player.isAi) return;
+    setIsStarted(true);
+
+    const timer = setTimeout(() => {
+      if (isAnswered) return;
+      const accuracy = player.aiDifficulty === 'easy' ? 0.6 : player.aiDifficulty === 'hard' ? 0.95 : 0.8;
+      const isCorrect = Math.random() < accuracy;
+      const chosen = isCorrect
+        ? question.correctAnswer
+        : (question.correctAnswer + 1) % question.options.length;
+      handleSelectOption(chosen);
+
+      setTimeout(() => {
+        const bonus = isCorrect ? calculateSpeedBonus(timeLeft) : 0;
+        onAnswer(isCorrect, isPropertyMode ? 0 : bonus, 2.0);
+      }, 1500);
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [player.isAi]);
+
   // Countdown timer effect
   useEffect(() => {
     if (!isStarted || isAnswered) return;
