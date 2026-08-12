@@ -57,7 +57,8 @@ export interface Character {
   id: CharacterId;
   name: string;
   title: string;
-  avatar: string; // Emoji or SVG icon
+  avatar: string; // Emoji or fallback
+  avatarImage?: string; // High-res 3D portrait art
   skillName: string;
   skillDescription: string;
   initialWisdomBonus: number;

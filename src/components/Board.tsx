@@ -153,10 +153,25 @@ export const Board: React.FC<Props> = ({
                 <div
                   key={p.id}
                   className={`player-token ${p.id === movingPlayerId ? 'jumping-token' : 'bounce-token'}`}
-                  style={{ backgroundColor: p.color }}
-                  title={p.name}
+                  style={{
+                    backgroundColor: p.color,
+                    borderColor: '#ffffff',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  title={`${p.name} (${p.character.name})`}
                 >
-                  {p.character.avatar}
+                  {p.character.avatarImage ? (
+                    <img
+                      src={p.character.avatarImage}
+                      alt={p.name}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }}
+                    />
+                  ) : (
+                    p.character.avatar
+                  )}
                 </div>
               ))}
             </div>
@@ -165,19 +180,30 @@ export const Board: React.FC<Props> = ({
       })}
 
       <div className="board-center">
-        <div style={{ textAlign: 'center', marginBottom: '16px' }}>
-          <h2 className="gold-gradient-text" style={{ fontSize: '1.3rem', marginBottom: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-            <Sparkles size={20} color="var(--primary-gold)" />
+        <div style={{ textAlign: 'center', marginBottom: '14px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <img
+            src="/images/board_logo.png"
+            alt="บาลีเศรษฐี"
+            style={{
+              width: '68px',
+              height: '68px',
+              objectFit: 'contain',
+              filter: 'drop-shadow(0 0 16px rgba(212,175,55,0.75))',
+              marginBottom: '4px',
+            }}
+          />
+          <h2 className="gold-gradient-text" style={{ fontSize: '1.25rem', margin: '0 0 2px 0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+            <Sparkles size={18} color="var(--primary-gold)" />
             กระดานบาลี ๔๐ วิชา
-            <Sparkles size={20} color="var(--primary-gold)" />
+            <Sparkles size={18} color="var(--primary-gold)" />
           </h2>
-          <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
             ตาของ: <strong style={{ color: currentTurnPlayer.color, fontSize: '0.95rem' }}>{currentTurnPlayer.name}</strong> {currentTurnPlayer.isAi && '(AI)'}
           </p>
         </div>
 
         {/* 3D Tumbling Rolling Dice Component */}
-        <div style={{ marginBottom: '20px' }}>
+        <div style={{ marginBottom: '16px' }}>
           <DiceRoller
             dice={dice}
             isDiceRolled={isDiceRolled}
@@ -191,12 +217,12 @@ export const Board: React.FC<Props> = ({
         <div
           style={{
             width: '100%',
-            maxHeight: '120px',
+            maxHeight: '110px',
             overflowY: 'auto',
-            background: 'rgba(0,0,0,0.4)',
+            background: 'rgba(0,0,0,0.45)',
             border: '1px solid rgba(255,255,255,0.1)',
             borderRadius: '10px',
-            padding: '10px',
+            padding: '8px 12px',
             fontSize: '0.75rem',
           }}
         >

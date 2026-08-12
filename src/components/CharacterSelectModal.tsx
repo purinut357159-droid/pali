@@ -391,16 +391,27 @@ export const CharacterSelectModal: React.FC<Props> = ({
                           key={char.id}
                           onClick={() => handleMultiCharChange(idx, char.id)}
                           style={{
-                            padding: '6px',
-                            borderRadius: '6px',
-                            border: `1px solid ${multiplayerConfig[idx].charId === char.id ? 'var(--primary-gold)' : 'rgba(255,255,255,0.05)'}`,
-                            background: multiplayerConfig[idx].charId === char.id ? 'rgba(212, 175, 55, 0.2)' : 'rgba(0,0,0,0.2)',
+                            padding: '6px 4px',
+                            borderRadius: '8px',
+                            border: `1.5px solid ${multiplayerConfig[idx].charId === char.id ? 'var(--primary-gold)' : 'rgba(255,255,255,0.08)'}`,
+                            background: multiplayerConfig[idx].charId === char.id ? 'rgba(212, 175, 55, 0.25)' : 'rgba(0,0,0,0.2)',
                             cursor: 'pointer',
                             textAlign: 'center',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
                           }}
                         >
-                          <div style={{ fontSize: '1.4rem' }}>{char.avatar}</div>
-                          <div style={{ fontSize: '0.7rem', color: '#fff', marginTop: '2px' }}>{char.name}</div>
+                          {char.avatarImage ? (
+                            <img
+                              src={char.avatarImage}
+                              alt={char.name}
+                              style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover', marginBottom: '4px' }}
+                            />
+                          ) : (
+                            <div style={{ fontSize: '1.4rem' }}>{char.avatar}</div>
+                          )}
+                          <div style={{ fontSize: '0.68rem', color: '#fff' }}>{char.name}</div>
                         </div>
                       ))}
                     </div>
@@ -441,15 +452,37 @@ export const CharacterSelectModal: React.FC<Props> = ({
                     onClick={() => setSingleCharId(char.id)}
                     style={{
                       padding: '10px 6px',
-                      borderRadius: '8px',
-                      border: `1px solid ${singleCharId === char.id ? 'var(--primary-gold)' : 'rgba(255,255,255,0.05)'}`,
-                      background: singleCharId === char.id ? 'rgba(212, 175, 55, 0.2)' : 'rgba(0,0,0,0.2)',
+                      borderRadius: '10px',
+                      border: `2px solid ${singleCharId === char.id ? 'var(--primary-gold)' : 'rgba(255,255,255,0.08)'}`,
+                      background: singleCharId === char.id ? 'rgba(212, 175, 55, 0.25)' : 'rgba(0,0,0,0.3)',
+                      boxShadow: singleCharId === char.id ? '0 0 16px rgba(212, 175, 55, 0.45)' : 'none',
                       cursor: 'pointer',
                       textAlign: 'center',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      transition: 'all 0.2s',
                     }}
                   >
-                    <div style={{ fontSize: '1.8rem' }}>{char.avatar}</div>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#fff', marginTop: '4px' }}>{char.name}</div>
+                    {char.avatarImage ? (
+                      <img
+                        src={char.avatarImage}
+                        alt={char.name}
+                        style={{
+                          width: '52px',
+                          height: '52px',
+                          borderRadius: '50%',
+                          objectFit: 'cover',
+                          border: `2px solid ${singleCharId === char.id ? 'var(--primary-gold)' : 'rgba(255,255,255,0.2)'}`,
+                          marginBottom: '6px',
+                          boxShadow: '0 4px 10px rgba(0,0,0,0.5)',
+                        }}
+                      />
+                    ) : (
+                      <div style={{ fontSize: '1.8rem' }}>{char.avatar}</div>
+                    )}
+                    <div style={{ fontSize: '0.78rem', fontWeight: 700, color: singleCharId === char.id ? 'var(--primary-gold)' : '#fff' }}>{char.name}</div>
+                    <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '2px' }}>{char.skillName}</div>
                   </div>
                 ))}
               </div>

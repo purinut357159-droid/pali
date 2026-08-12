@@ -20,10 +20,25 @@ export const PlayerCard: React.FC<Props> = ({ player, isCurrentTurn }) => {
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ fontSize: '1.6rem', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))' }}>
-            {player.character.avatar}
-          </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {player.character.avatarImage ? (
+            <img
+              src={player.character.avatarImage}
+              alt={player.name}
+              style={{
+                width: '42px',
+                height: '42px',
+                borderRadius: '50%',
+                objectFit: 'cover',
+                border: `2px solid ${player.color}`,
+                boxShadow: `0 0 10px ${player.color}`,
+              }}
+            />
+          ) : (
+            <span style={{ fontSize: '1.6rem', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))' }}>
+              {player.character.avatar}
+            </span>
+          )}
           <div>
             <h3 style={{ fontSize: '0.95rem', margin: 0, color: player.color }}>
               {player.name} {player.isAi && <span style={{ fontSize: '0.7rem', color: '#a0aec0' }}>(AI)</span>}
