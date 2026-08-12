@@ -516,27 +516,7 @@ export const App: React.FC = () => {
           addLog(`❌ ${p.name} ตอบคำถามบาลีไม่ถูกต้อง! จึงไม่ได้รับสิทธิ์ครอบครองวิชา "${targetTile.name}" (ไม่เสียแต้มซื้อ)`, 'danger');
         } else if (mode === 'upgrade' && targetTile) {
           addLog(`❌ ${p.name} ตอบคำถามบาลีไม่ถูกต้อง! จึงไม่สามารถอัปเกรดวิชา "${targetTile.name}" ได้ (ไม่เสียแต้มอัปเกรด)`, 'danger');
-        } else if (mode === 'quiz') {
-          p.tutoringWrongCount = (p.tutoringWrongCount || 0) + 1;
-          if (p.tutoringWrongCount >= 3) {
-            p.isSkipTurn = true;
-            p.tutoringWrongCount = 0;
-            audioManager.playJailSound();
-            addLog(`🚨 ${p.name} ตอบคำถามในห้องติวเพิ่มเติมผิดสะสมครบ 3 ข้อ! ถูกสั่งให้อยู่ติวเข้มซ่อมเสริม หยุดพักการเดิน 1 ตา!`, 'danger');
-          } else {
-            addLog(`❌ ${p.name} ตอบผิดในห้องติวเพิ่มเติม (สะสมผิด ${p.tutoringWrongCount}/3 ข้อ - หากผิดครบ 3 ข้อจะหยุดเดิน 1 ตา)`, 'warning');
-          }
-        } else {
-          addLog(`${p.name} ตอบคำถามบาลีไม่ถูกต้อง หรือหมดเวลา`, 'danger');
-        }
-
-        newReviewItems = addWrongQuestionToSRS(prev.reviewItems, question);
-
-        if (currentUser) {
-          syncUserReviewDeck(currentUser.id, newReviewItems);
-        }
-
-        if (mode === 'rent' && targetTile) {
+        } else if (mode === 'rent' && targetTile) {
           const owner = prev.players.find((item) => item.id === targetTile.ownerId);
           if (owner) {
             const combo = checkPropertyCombo(prev.tiles, targetTile, owner.id);
@@ -551,6 +531,32 @@ export const App: React.FC = () => {
             owner.wisdomPoints += baseRent;
             addLog(`${p.name} ตอบผิด! จ่ายค่าผ่านทางเต็มจำนวน (${baseRent} แต้ม)`, 'danger');
           }
+        } else if (mode === 'quiz') {
+          addLog(`❌ ${p.name} ตอบคำถามในห้องติวเพิ่มเติมไม่ถูกต้อง`, 'danger');
+        } else if (mode === 'exam') {
+          addLog(`❌ ${p.name} ตอบคำถามในสนามสอบเปรียญไม่ถูกต้อง`, 'danger');
+        } else {
+          addLog(`${p.name} ตอบคำถามบาลีไม่ถูกต้อง หรือหมดเวลา`, 'danger');
+        }
+
+        // Global 3 Wrong Answers Rule -> Send to Tile 20 (สนามติวเข้มพิเศษ)
+        p.tutoringWrongCount = (p.tutoringWrongCount || 0) + 1;
+        if (p.tutoringWrongCount >= 3) {
+          p.position = 20; // Teleport to Tile 20: สนามติวเข้มพิเศษ (ห้องกักตัว)
+          p.isSkipTurn = true; // Skip 1 turn
+          p.tutoringWrongCount = 0;
+          p.doublesStreak = 0;
+          setRolledDoubles(false);
+          audioManager.playJailSound();
+          addLog(`🚨 ${p.name} ตอบคำถามผิดสะสมครบ 3 ข้อจากที่ต่างๆ! ถูกส่งตัวเข้า "สนามติวเข้มพิเศษ (ช่อง 20)" เพื่อกักตัวติวเข้ม และหยุดเดิน 1 ตา!`, 'danger');
+        } else {
+          addLog(`⚠️ ${p.name} ตอบผิดสะสม ${p.tutoringWrongCount}/3 ข้อ (หากผิดครบ 3 ข้อ จะถูกส่งเข้าสนามติวเข้มพิเศษ ช่อง 20 และหยุดเดิน 1 ตา)`, 'warning');
+        }
+
+        newReviewItems = addWrongQuestionToSRS(prev.reviewItems, question);
+
+        if (currentUser) {
+          syncUserReviewDeck(currentUser.id, newReviewItems);
         }
       }
 

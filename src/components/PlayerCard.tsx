@@ -114,7 +114,7 @@ export const PlayerCard: React.FC<Props> = ({ player, isCurrentTurn }) => {
             marginBottom: '6px',
           }}
         >
-          <span>🛑 ติดภารกิจ (หยุดเดิน 1 ตา)</span>
+          <span>🛑 {player.position === 20 ? 'กักตัว ณ สนามติวเข้มพิเศษ (หยุดเดิน 1 ตา)' : 'ติดภารกิจ (หยุดเดิน 1 ตา)'}</span>
         </div>
       )}
 
@@ -133,7 +133,7 @@ export const PlayerCard: React.FC<Props> = ({ player, isCurrentTurn }) => {
             marginBottom: '6px',
           }}
         >
-          <span>👨‍🏫 ติวผิดสะสม: {player.tutoringWrongCount}/3 ข้อ</span>
+          <span>⚠️ ตอบผิดสะสม: {player.tutoringWrongCount}/3 ข้อ</span>
         </div>
       )}
 
