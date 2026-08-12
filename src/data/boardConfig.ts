@@ -103,12 +103,12 @@ export const BOARD_TILES: BoardTile[] = [
     icon: '🔤',
     color: '#06b6d4',
   },
-  // Tile 10: พัก
+  // Tile 10: เรือนพักผ่อน (คุก / แค่แวะเยี่ยม)
   {
     id: 10,
-    name: 'เรือนพักผ่อน',
+    name: 'เรือนพักผ่อน (แวะเยี่ยม)',
     type: 'rest',
-    description: 'พักผ่อนอิริยาบถ ไม่มีผลใดๆ',
+    description: 'แวะพักผ่อนอิริยาบถชั่วคราว (แค่แวะเยี่ยม ไม่เสียตาเล่น)',
     icon: '🛕',
     color: '#8b5cf6',
   },
@@ -307,14 +307,14 @@ export const BOARD_TILES: BoardTile[] = [
     icon: '☸️',
     color: '#eab308',
   },
-  // Tile 30: สนามสอบเปรียญ (Corner)
+  // Tile 30: ส่งเข้าเรือนพักผ่อน (Go To Rest / Jail Corner)
   {
     id: 30,
-    name: 'สนามสอบเปรียญ',
-    type: 'exam',
-    description: 'สนามสอบใหญ่ทดสอบความรู้ระดับมหาเปรียญ',
-    icon: '👑',
-    color: '#d97706',
+    name: 'ส่งเข้าเรือนพักผ่อน',
+    type: 'goto_jail',
+    description: 'ถูกส่งตัวไปยังช่อง 10 (เรือนพักผ่อน) ทันที และติดภารกิจหยุดพัก 1 ตา!',
+    icon: '🚨',
+    color: '#ef4444',
   },
   // Tile 31-34: พระวินัย
   {

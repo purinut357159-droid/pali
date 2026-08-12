@@ -1,6 +1,6 @@
 export type DifficultyLevel = 1 | 2 | 3 | 4 | 5;
 
-export type TileType = 'subject' | 'boon' | 'karma' | 'quiz' | 'exam' | 'rest' | 'start';
+export type TileType = 'subject' | 'boon' | 'karma' | 'quiz' | 'exam' | 'rest' | 'start' | 'goto_jail';
 
 export type SubjectCategory = 
   | 'ไวยากรณ์' 

@@ -11,6 +11,7 @@ import {
   Flag,
   Sparkles,
   Zap,
+  AlertTriangle,
 } from 'lucide-react';
 
 interface Props {
@@ -50,6 +51,8 @@ export const Board: React.FC<Props> = ({
         return <Award size={16} color="#ec4899" />;
       case 'rest':
         return <Coffee size={16} color="#8b5cf6" />;
+      case 'goto_jail':
+        return <AlertTriangle size={16} color="#ef4444" />;
       case 'subject':
       default:
         return <Book size={14} color={tile.color || '#d4af37'} />;

@@ -315,6 +315,21 @@ export const App: React.FC = () => {
       triggerQuestion(tile, 'quiz', 'ช่องสอบย่อย! ตอบถูกรับแต้มปัญญา +150 แต้ม');
     } else if (tile.type === 'exam') {
       triggerQuestion(tile, 'exam', 'สนามสอบเปรียญ! ตอบถูกรับโบนัสใหญ่ +300 แต้ม');
+    } else if (tile.type === 'goto_jail') {
+      addLog(`🚨 ${currentPlayer.name} ตกช่อง "${tile.name}"! ถูกส่งตัวไปยังช่อง 10 (เรือนพักผ่อน) และติดภารกิจหยุดพัก 1 ตา!`, 'danger');
+      setGameState((prev) => {
+        const updatedPlayers = [...prev.players];
+        const p = updatedPlayers[prev.currentTurnPlayerIndex];
+        p.position = 10;
+        p.isSkipTurn = true;
+        p.doublesStreak = 0;
+        return { ...prev, players: updatedPlayers };
+      });
+      setTimeout(nextTurn, 1200);
+      return;
+    } else if (tile.type === 'rest') {
+      addLog(`🧘‍♂️ ${currentPlayer.name} เดินมาแวะพัก ณ ${tile.name} (แวะเยี่ยมเฉยๆ ไม่เสียตาเล่น)`, 'info');
+      finishTurnCheck();
     } else {
       addLog(`${currentPlayer.name} พักผ่อน ณ ${tile.name}`, 'info');
       finishTurnCheck();
