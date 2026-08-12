@@ -1,12 +1,14 @@
 import React from 'react';
 import type { BoardTile, Player } from '../types/game';
-import { X, ArrowUpCircle, ShoppingBag, DollarSign, RefreshCw } from 'lucide-react';
+import { X, ArrowUpCircle, ShoppingBag, DollarSign, RefreshCw, Flame } from 'lucide-react';
 import { audioManager } from '../utils/audioManager';
+import { checkPropertyCombo, UPGRADE_NAMES } from '../utils/comboEngine';
 
 interface Props {
   tile: BoardTile;
   owner?: Player;
   currentPlayer: Player;
+  allTiles?: BoardTile[];
   onClose: () => void;
   onUpgrade?: (tile: BoardTile) => void;
   onBuy?: (tile: BoardTile) => void;
@@ -19,6 +21,7 @@ export const TileDetailModal: React.FC<Props> = ({
   tile,
   owner,
   currentPlayer,
+  allTiles = [],
   onClose,
   onUpgrade,
   onBuy,
@@ -26,7 +29,7 @@ export const TileDetailModal: React.FC<Props> = ({
   onTakeover,
   isCurrentPlayerOnTile,
 }) => {
-  const upgradeNames = ['ตำรา (Base)', 'ห้องเรียน', 'สำนักเรียน', 'สนามสอบ', 'มหาวิทยาลัยบาลี'];
+  const upgradeNames = UPGRADE_NAMES;
 
   const canUpgrade =
     isCurrentPlayerOnTile &&
@@ -58,6 +61,8 @@ export const TileDetailModal: React.FC<Props> = ({
   const sellPrice = tile.price
     ? Math.floor(tile.price * 0.5 + (tile.upgradeLevel || 0) * (tile.upgradeCost || 0) * 0.5)
     : 0;
+
+  const combo = owner && allTiles.length > 0 ? checkPropertyCombo(allTiles, tile, owner.id) : null;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -94,7 +99,7 @@ export const TileDetailModal: React.FC<Props> = ({
               background: 'rgba(255,255,255,0.05)',
               padding: '10px 14px',
               borderRadius: '8px',
-              marginBottom: '16px',
+              marginBottom: '14px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
@@ -106,13 +111,39 @@ export const TileDetailModal: React.FC<Props> = ({
             </strong>
           </div>
         ) : tile.type === 'subject' ? (
-          <div style={{ color: '#4ade80', fontSize: '0.85rem', marginBottom: '16px' }}>
+          <div style={{ color: '#4ade80', fontSize: '0.85rem', marginBottom: '14px' }}>
             ✨ วิชานี้ยังไม่มีเจ้าของ สามารถตอบคำถามเพื่อครอบครองได้!
           </div>
         ) : (
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '14px' }}>
             {tile.description}
           </p>
+        )}
+
+        {/* Combo Multiplier Banner */}
+        {combo?.hasCombo && (
+          <div
+            style={{
+              background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(245, 158, 11, 0.2))',
+              border: '1px solid #f59e0b',
+              borderRadius: '10px',
+              padding: '10px 14px',
+              marginBottom: '16px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#f59e0b', fontWeight: 700, fontSize: '0.85rem' }}>
+              <Flame size={16} color="#ef4444" />
+              <span>🔥 โบนัสคอมโบ x{combo.multiplier} เท่า ทำงานอยู่!</span>
+            </div>
+            <div style={{ fontSize: '0.75rem', color: '#fef08a', marginTop: '4px' }}>
+              {combo.reasons.map((r, i) => (
+                <div key={i}>• {r}</div>
+              ))}
+            </div>
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+              *เมื่อมีผู้เล่นตกในช่องนี้ ค่าผ่านทางจะเพิ่มเป็น 2 เท่าทันที
+            </div>
+          </div>
         )}
 
         {tile.type === 'subject' && tile.rents && (
@@ -121,14 +152,17 @@ export const TileDetailModal: React.FC<Props> = ({
               📊 ตารางค่าผ่านทาง (Monopoly Rent Table)
             </h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              {tile.rents.map((rent, idx) => {
+              {tile.rents.map((baseRent, idx) => {
                 const isCurrentLevel = tile.upgradeLevel === idx;
+                const effectiveRent = combo?.hasCombo ? baseRent * combo.multiplier : baseRent;
+
                 return (
                   <div
                     key={idx}
                     style={{
                       display: 'flex',
                       justifyContent: 'space-between',
+                      alignItems: 'center',
                       padding: '6px 10px',
                       borderRadius: '6px',
                       background: isCurrentLevel ? 'rgba(212, 175, 55, 0.2)' : 'rgba(255,255,255,0.03)',
@@ -139,9 +173,16 @@ export const TileDetailModal: React.FC<Props> = ({
                     <span>
                       {idx > 0 ? '🏫' : '📜'} {upgradeNames[idx]}
                     </span>
-                    <strong style={{ color: isCurrentLevel ? 'var(--primary-gold)' : 'var(--text-muted)' }}>
-                      💡 {rent} แต้ม
-                    </strong>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      {combo?.hasCombo && isCurrentLevel && (
+                        <span style={{ fontSize: '0.7rem', color: '#ef4444', fontWeight: 700 }}>
+                          (x{combo.multiplier})
+                        </span>
+                      )}
+                      <strong style={{ color: isCurrentLevel ? 'var(--primary-gold)' : 'var(--text-muted)' }}>
+                        💡 {effectiveRent} แต้ม
+                      </strong>
+                    </div>
                   </div>
                 );
               })}

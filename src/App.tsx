@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import type { GameState, Player, BoardTile, Question, CardEffect, GameMode, SubjectCategory } from './types/game';
+import type { GameState, Player, BoardTile, Question, CardEffect, GameMode } from './types/game';
 import type { UserAccount } from './types/auth';
 import { BOARD_TILES } from './data/boardConfig';
 import { QUESTION_BANK } from './data/questionBank';
@@ -24,6 +24,7 @@ import {
   recordMatchResult,
   syncUserReviewDeck,
 } from './utils/authService';
+import { checkPropertyCombo } from './utils/comboEngine';
 
 function shuffleQuestionOptions(q: Question): Question {
   const originalCorrectText = q.options[q.correctAnswer];
@@ -178,12 +179,6 @@ export const App: React.FC = () => {
     }
   }, [gameState.gameStatus, gameState.winner, gameState.players, currentUser, matchRecorded]);
 
-  const hasColorGroupMonopoly = (tiles: BoardTile[], playerId: string, category?: SubjectCategory): boolean => {
-    if (!category) return false;
-    const categoryTiles = tiles.filter((t) => t.category === category);
-    return categoryTiles.length > 0 && categoryTiles.every((t) => t.ownerId === playerId);
-  };
-
   const handleRollDice = () => {
     if (gameState.isDiceRolled || gameState.gameStatus !== 'playing' || movingPlayerId) return;
 
@@ -306,7 +301,9 @@ export const App: React.FC = () => {
         addLog(`${currentPlayer.name} ตกเมืองวิชาของตนเอง (${tile.name})`, 'info');
         setActiveTileDetail(tile);
       } else {
-        triggerQuestion(tile, 'rent', `ตกเมืองของ ${owner.name}! ตอบคำถามเพื่อลดค่าผ่านทาง`);
+        const combo = checkPropertyCombo(gameState.tiles, tile, owner.id);
+        const comboTag = combo.hasCombo ? ` 🔥(คอมโบ x${combo.multiplier}!)` : '';
+        triggerQuestion(tile, 'rent', `ตกเมืองของ ${owner.name}!${comboTag} ตอบคำถามเพื่อลดค่าผ่านทาง`);
       }
     } else if (tile.type === 'boon') {
       const card = BOON_CARDS[Math.floor(Math.random() * BOON_CARDS.length)];
@@ -400,11 +397,14 @@ export const App: React.FC = () => {
         } else if (mode === 'rent' && targetTile) {
           const owner = prev.players.find((item) => item.id === targetTile.ownerId);
           if (owner) {
+            const combo = checkPropertyCombo(prev.tiles, targetTile, owner.id);
             let baseRent = targetTile.rents ? targetTile.rents[targetTile.upgradeLevel || 0] : 50;
-            if (targetTile.upgradeLevel === 0 && hasColorGroupMonopoly(prev.tiles, owner.id, targetTile.category)) {
-              baseRent *= 2;
-              addLog(`🏠 ${owner.name} ครอบครองวิชาหมวด ${targetTile.category} ครบเซ็ต! ค่าผ่านทาง x2`, 'warning');
+
+            if (combo.hasCombo) {
+              baseRent = Math.floor(baseRent * combo.multiplier);
+              addLog(`🔥 COMBO x${combo.multiplier}! ${owner.name} ${combo.reasons.join(' และ ')}! ค่าผ่านทางเพิ่มเป็น 2 เท่า (${baseRent} แต้ม)`, 'warning');
             }
+
             const discountedRent = Math.floor(baseRent * 0.5);
             p.wisdomPoints -= discountedRent;
             owner.wisdomPoints += discountedRent;
@@ -427,11 +427,14 @@ export const App: React.FC = () => {
         if (mode === 'rent' && targetTile) {
           const owner = prev.players.find((item) => item.id === targetTile.ownerId);
           if (owner) {
+            const combo = checkPropertyCombo(prev.tiles, targetTile, owner.id);
             let baseRent = targetTile.rents ? targetTile.rents[targetTile.upgradeLevel || 0] : 50;
-            if (targetTile.upgradeLevel === 0 && hasColorGroupMonopoly(prev.tiles, owner.id, targetTile.category)) {
-              baseRent *= 2;
-              addLog(`🏠 ${owner.name} ครอบครองวิชาหมวด ${targetTile.category} ครบเซ็ต! ค่าผ่านทาง x2`, 'warning');
+
+            if (combo.hasCombo) {
+              baseRent = Math.floor(baseRent * combo.multiplier);
+              addLog(`🔥 COMBO x${combo.multiplier}! ${owner.name} ${combo.reasons.join(' และ ')}! ค่าผ่านทางเพิ่มเป็น 2 เท่า (${baseRent} แต้ม)`, 'warning');
             }
+
             p.wisdomPoints -= baseRent;
             owner.wisdomPoints += baseRent;
             addLog(`${p.name} ตอบผิด! จ่ายค่าผ่านทางเต็มจำนวน (${baseRent} แต้ม)`, 'danger');
@@ -721,6 +724,7 @@ export const App: React.FC = () => {
           tile={activeTileDetail}
           owner={gameState.players.find((p) => p.id === activeTileDetail.ownerId)}
           currentPlayer={currentPlayer}
+          allTiles={gameState.tiles}
           onClose={() => {
             setActiveTileDetail(null);
             if (currentPlayer.position === activeTileDetail.id) {

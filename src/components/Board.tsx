@@ -1,6 +1,7 @@
 import React from 'react';
 import type { BoardTile, Player, GameLog } from '../types/game';
 import { DiceRoller } from './DiceRoller';
+import { checkPropertyCombo } from '../utils/comboEngine';
 import {
   Book,
   Gift,
@@ -72,6 +73,7 @@ export const Board: React.FC<Props> = ({
       {tiles.map((tile) => {
         const playersOnTile = players.filter((p) => p.position === tile.id);
         const owner = players.find((p) => p.id === tile.ownerId);
+        const combo = owner ? checkPropertyCombo(tiles, tile, owner.id) : null;
 
         return (
           <div
@@ -80,9 +82,33 @@ export const Board: React.FC<Props> = ({
             style={{
               ...getTilePositionStyle(tile.id),
               borderColor: owner ? owner.color : 'rgba(212, 175, 55, 0.2)',
+              position: 'relative',
+              boxShadow: combo?.hasCombo ? '0 0 10px rgba(245, 158, 11, 0.4)' : undefined,
             }}
             onClick={() => onTileClick(tile)}
           >
+            {/* Combo Multiplier Tag */}
+            {combo?.hasCombo && (
+              <span
+                style={{
+                  position: 'absolute',
+                  top: '2px',
+                  right: '2px',
+                  background: 'linear-gradient(135deg, #ef4444, #f59e0b)',
+                  color: '#fff',
+                  fontSize: '0.52rem',
+                  fontWeight: 800,
+                  padding: '1px 3px',
+                  borderRadius: '4px',
+                  boxShadow: '0 0 5px rgba(245, 158, 11, 0.8)',
+                  zIndex: 2,
+                }}
+                title={`🔥 คอมโบ x${combo.multiplier}: ${combo.reasons.join(' และ ')}`}
+              >
+                🔥x{combo.multiplier}
+              </span>
+            )}
+
             {tile.category && (
               <div
                 className="board-tile-category-bar"
