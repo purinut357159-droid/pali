@@ -17,6 +17,7 @@ import { WinnerModal } from './components/WinnerModal';
 import { ChatWidget } from './components/ChatWidget';
 import { AuthModal } from './components/AuthModal';
 import { UserProfileModal } from './components/UserProfileModal';
+import { LeaderboardModal } from './components/LeaderboardModal';
 import { addWrongQuestionToSRS, markQuestionMastered } from './utils/srsEngine';
 import { audioManager } from './utils/audioManager';
 import {
@@ -49,6 +50,7 @@ export const App: React.FC = () => {
   const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
   const [authModalTab, setAuthModalTab] = useState<'login' | 'register' | 'saved'>('login');
   const [showProfileModal, setShowProfileModal] = useState<boolean>(false);
+  const [showLeaderboardModal, setShowLeaderboardModal] = useState<boolean>(false);
   const [matchRecorded, setMatchRecorded] = useState<boolean>(false);
 
   const [gameState, setGameState] = useState<GameState>({
@@ -164,6 +166,10 @@ export const App: React.FC = () => {
 
         if (recordRes) {
           setCurrentUser(recordRes.user);
+
+          if (recordRes.streakGained > 1) {
+            addLog(`🔥 ยอดเยี่ยม! ${recordRes.user.displayName} ชนะการแข่งขันต่อเนื่อง ${recordRes.streakGained} เกมติดต่อกัน!`, 'success');
+          }
 
           if (recordRes.leveledUp) {
             addLog(`🎉 ยินดีด้วย! ${recordRes.user.displayName} เลื่อนระดับสู่ Lv.${recordRes.newLevel} (${recordRes.user.rankTitle})!`, 'success');
@@ -661,6 +667,7 @@ export const App: React.FC = () => {
           setShowAuthModal(true);
         }}
         onOpenProfileModal={() => setShowProfileModal(true)}
+        onOpenLeaderboard={() => setShowLeaderboardModal(true)}
       />
 
       {gameState.gameStatus === 'playing' && (
@@ -834,8 +841,19 @@ export const App: React.FC = () => {
             setAuthModalTab('saved');
             setShowAuthModal(true);
           }}
+          onOpenLeaderboard={() => {
+            setShowProfileModal(false);
+            setShowLeaderboardModal(true);
+          }}
         />
       )}
+
+      {/* Leaderboard Modal */}
+      <LeaderboardModal
+        isOpen={showLeaderboardModal}
+        onClose={() => setShowLeaderboardModal(false)}
+        currentUserId={currentUser?.id}
+      />
 
       <ChatWidget />
     </div>

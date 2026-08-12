@@ -2,8 +2,8 @@ import type { UserAccount, AuthSession, Achievement } from '../types/auth';
 import { ACHIEVEMENTS_LIST, getRankTitle } from '../types/auth';
 import type { ReviewItem, CharacterId } from '../types/game';
 
-const STORAGE_KEY_ACCOUNTS = 'pali_accounts_v1';
-const STORAGE_KEY_SESSION = 'pali_session_v1';
+const STORAGE_KEY_ACCOUNTS = 'pali_accounts_v2';
+const STORAGE_KEY_SESSION = 'pali_session_v2';
 
 function hashPassword(password: string): string {
   try {
@@ -23,20 +23,74 @@ const INITIAL_DEMO_ACCOUNTS: UserAccount[] = [
     favoriteCharacter: 'monk',
     createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
     lastLogin: new Date().toISOString(),
-    level: 5,
-    exp: 420,
+    level: 7,
+    exp: 980,
     rankTitle: 'มหาเปรียญตรี (ป.ธ.๓)',
     stats: {
-      gamesPlayed: 8,
-      gamesWon: 5,
-      correctAnswers: 34,
-      totalAnswers: 40,
-      propertiesBought: 28,
-      examsPassed: 4,
-      totalWisdomEarned: 16500,
+      gamesPlayed: 14,
+      gamesWon: 11,
+      currentWinStreak: 5,
+      maxWinStreak: 5,
+      correctAnswers: 52,
+      totalAnswers: 58,
+      propertiesBought: 36,
+      examsPassed: 6,
+      totalWisdomEarned: 24500,
     },
     reviewItems: [],
-    achievements: ['first_win', 'scholar_10', 'exam_master'],
+    achievements: ['first_win', 'streak_3', 'streak_5', 'scholar_10', 'scholar_50', 'exam_master', 'landlord'],
+  },
+  {
+    id: 'user_demo_2',
+    username: 'novice_mind',
+    passwordHash: hashPassword('123456'),
+    displayName: 'สามเณรปัญญาวุฑโฒ',
+    avatar: '👦',
+    favoriteCharacter: 'novice',
+    createdAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
+    lastLogin: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+    level: 6,
+    exp: 820,
+    rankTitle: 'มหาเปรียญตรี (ป.ธ.๓)',
+    stats: {
+      gamesPlayed: 12,
+      gamesWon: 8,
+      currentWinStreak: 3,
+      maxWinStreak: 4,
+      correctAnswers: 44,
+      totalAnswers: 50,
+      propertiesBought: 26,
+      examsPassed: 4,
+      totalWisdomEarned: 18900,
+    },
+    reviewItems: [],
+    achievements: ['first_win', 'streak_3', 'scholar_10', 'exam_master'],
+  },
+  {
+    id: 'user_demo_3',
+    username: 'teacher_dhamma',
+    passwordHash: hashPassword('123456'),
+    displayName: 'พระอาจารย์กิตติเมธี',
+    avatar: '👨‍🏫',
+    favoriteCharacter: 'teacher',
+    createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+    lastLogin: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    level: 9,
+    exp: 1350,
+    rankTitle: 'มหาเปรียญโท (ป.ธ.๖)',
+    stats: {
+      gamesPlayed: 20,
+      gamesWon: 15,
+      currentWinStreak: 2,
+      maxWinStreak: 7,
+      correctAnswers: 78,
+      totalAnswers: 84,
+      propertiesBought: 48,
+      examsPassed: 8,
+      totalWisdomEarned: 38000,
+    },
+    reviewItems: [],
+    achievements: ['first_win', 'streak_3', 'streak_5', 'scholar_10', 'scholar_50', 'exam_master', 'landlord'],
   },
 ];
 
@@ -65,12 +119,10 @@ export function saveStoredAccounts(accounts: UserAccount[]): void {
 
 export function getCurrentSession(): AuthSession | null {
   try {
-    // Check localStorage first (remember me)
     const localRaw = localStorage.getItem(STORAGE_KEY_SESSION);
     if (localRaw) {
       return JSON.parse(localRaw);
     }
-    // Check sessionStorage (temporary)
     const sessionRaw = sessionStorage.getItem(STORAGE_KEY_SESSION);
     if (sessionRaw) {
       return JSON.parse(sessionRaw);
@@ -153,6 +205,8 @@ export function registerAccount(
     stats: {
       gamesPlayed: 0,
       gamesWon: 0,
+      currentWinStreak: 0,
+      maxWinStreak: 0,
       correctAnswers: 0,
       totalAnswers: 0,
       propertiesBought: 0,
@@ -289,7 +343,7 @@ export function recordMatchResult(
     propertiesBought: number;
     examsPassed: number;
   }
-): { user: UserAccount; newLevel: number; leveledUp: boolean; newAchievements: Achievement[] } | null {
+): { user: UserAccount; newLevel: number; leveledUp: boolean; newAchievements: Achievement[]; streakGained: number } | null {
   const accounts = getStoredAccounts();
   const userIndex = accounts.findIndex((acc) => acc.id === userId);
   if (userIndex < 0) return null;
@@ -297,9 +351,31 @@ export function recordMatchResult(
   const user = accounts[userIndex];
   const prevLevel = user.level;
 
+  // Initialize stats safeguards
+  if (!user.stats) {
+    user.stats = {
+      gamesPlayed: 0,
+      gamesWon: 0,
+      currentWinStreak: 0,
+      maxWinStreak: 0,
+      correctAnswers: 0,
+      totalAnswers: 0,
+      propertiesBought: 0,
+      examsPassed: 0,
+      totalWisdomEarned: 0,
+    };
+  }
+
   // Update Stats
   user.stats.gamesPlayed += 1;
-  if (matchData.isWinner) user.stats.gamesWon += 1;
+  if (matchData.isWinner) {
+    user.stats.gamesWon += 1;
+    user.stats.currentWinStreak = (user.stats.currentWinStreak || 0) + 1;
+    user.stats.maxWinStreak = Math.max(user.stats.maxWinStreak || 0, user.stats.currentWinStreak);
+  } else {
+    user.stats.currentWinStreak = 0;
+  }
+
   user.stats.correctAnswers += matchData.correctAnswers;
   user.stats.totalAnswers += matchData.totalAnswers;
   user.stats.propertiesBought += matchData.propertiesBought;
@@ -309,11 +385,14 @@ export function recordMatchResult(
   // Calculate EXP:
   // Base match exp: 50
   // Win bonus: +100
+  // Streak bonus: +20 * currentWinStreak
   // Per correct answer: +15
   // Per exam passed: +30
+  const streakBonus = matchData.isWinner ? (user.stats.currentWinStreak || 1) * 20 : 0;
   const gainedExp =
     50 +
     (matchData.isWinner ? 100 : 0) +
+    streakBonus +
     matchData.correctAnswers * 15 +
     matchData.examsPassed * 30;
 
@@ -337,6 +416,8 @@ export function recordMatchResult(
   };
 
   checkAchievement('first_win', user.stats.gamesWon >= 1);
+  checkAchievement('streak_3', (user.stats.maxWinStreak || 0) >= 3);
+  checkAchievement('streak_5', (user.stats.maxWinStreak || 0) >= 5);
   checkAchievement('scholar_10', user.stats.correctAnswers >= 10);
   checkAchievement('scholar_50', user.stats.correctAnswers >= 50);
   checkAchievement('exam_master', user.stats.examsPassed >= 3);
@@ -361,5 +442,31 @@ export function recordMatchResult(
     newLevel: user.level,
     leveledUp: user.level > prevLevel,
     newAchievements: newlyUnlocked,
+    streakGained: user.stats.currentWinStreak,
   };
+}
+
+export function getLeaderboardAccounts(
+  sortBy: 'streak' | 'wins' | 'level' | 'wisdom' = 'streak'
+): UserAccount[] {
+  const accounts = getStoredAccounts();
+  const sorted = [...accounts].sort((a, b) => {
+    if (sortBy === 'streak') {
+      const diff = (b.stats?.maxWinStreak || 0) - (a.stats?.maxWinStreak || 0);
+      if (diff !== 0) return diff;
+      return (b.stats?.currentWinStreak || 0) - (a.stats?.currentWinStreak || 0);
+    } else if (sortBy === 'wins') {
+      const diff = (b.stats?.gamesWon || 0) - (a.stats?.gamesWon || 0);
+      if (diff !== 0) return diff;
+      return (b.stats?.totalWisdomEarned || 0) - (a.stats?.totalWisdomEarned || 0);
+    } else if (sortBy === 'level') {
+      const diff = (b.level || 1) - (a.level || 1);
+      if (diff !== 0) return diff;
+      return (b.exp || 0) - (a.exp || 0);
+    } else {
+      return (b.stats?.totalWisdomEarned || 0) - (a.stats?.totalWisdomEarned || 0);
+    }
+  });
+
+  return sorted;
 }

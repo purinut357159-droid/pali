@@ -11,6 +11,7 @@ import {
   Users,
   BarChart2,
   TrendingUp,
+  Flame,
 } from 'lucide-react';
 import type { UserAccount } from '../types/auth';
 import { ACHIEVEMENTS_LIST, getRankTitle } from '../types/auth';
@@ -25,6 +26,7 @@ interface Props {
   onUpdateUser: (updatedUser: UserAccount) => void;
   onLogout: () => void;
   onSwitchAccount: () => void;
+  onOpenLeaderboard?: () => void;
 }
 
 const AVATAR_PRESETS = ['🧘‍♂️', '👨‍🏫', '👦', '🎓', '📿', '📜', '✨', '🏯', '👑', '🕊️'];
@@ -36,6 +38,7 @@ export const UserProfileModal: React.FC<Props> = ({
   onUpdateUser,
   onLogout,
   onSwitchAccount,
+  onOpenLeaderboard,
 }) => {
   const [activeTab, setActiveTab] = useState<'stats' | 'achievements' | 'edit'>('stats');
 
@@ -55,9 +58,9 @@ export const UserProfileModal: React.FC<Props> = ({
   const levelExpRange = expForNextLevel - expForCurrentLevel;
   const expPercentage = Math.min(100, Math.round((progressInLevel / levelExpRange) * 100));
 
-  const winRate = user.stats.gamesPlayed > 0 ? Math.round((user.stats.gamesWon / user.stats.gamesPlayed) * 100) : 0;
+  const winRate = user.stats?.gamesPlayed > 0 ? Math.round((user.stats.gamesWon / user.stats.gamesPlayed) * 100) : 0;
   const accuracyRate =
-    user.stats.totalAnswers > 0 ? Math.round((user.stats.correctAnswers / user.stats.totalAnswers) * 100) : 0;
+    user.stats?.totalAnswers > 0 ? Math.round((user.stats.correctAnswers / user.stats.totalAnswers) * 100) : 0;
   const masteredVocabCount = user.reviewItems ? user.reviewItems.filter((i) => i.mastered).length : 0;
   const totalDeckCount = user.reviewItems ? user.reviewItems.length : 0;
 
@@ -272,6 +275,49 @@ export const UserProfileModal: React.FC<Props> = ({
         {/* TAB 1: STATISTICS */}
         {activeTab === 'stats' && (
           <div>
+            {/* Win Streak Card Highlight */}
+            <div
+              style={{
+                background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(245, 158, 11, 0.2))',
+                border: '1px solid rgba(245, 158, 11, 0.4)',
+                borderRadius: '12px',
+                padding: '14px',
+                marginBottom: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div
+                  style={{
+                    width: '42px',
+                    height: '42px',
+                    borderRadius: '10px',
+                    background: 'rgba(239, 68, 68, 0.3)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Flame size={24} color="#ef4444" />
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>สถิติชนะต่อเนื่อง (Win Streak)</div>
+                  <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#f59e0b' }}>
+                    กำลังชนะต่อเนื่อง {user.stats?.currentWinStreak || 0} ตาติด
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>ชนะต่อเนื่องสูงสุด</div>
+                <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#fff' }}>
+                  ⚡ {user.stats?.maxWinStreak || 0} ตาติด
+                </div>
+              </div>
+            </div>
+
             <div
               style={{
                 display: 'grid',
@@ -283,14 +329,14 @@ export const UserProfileModal: React.FC<Props> = ({
               <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '10px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.06)' }}>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>จำนวนเกมที่เล่น</div>
                 <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#fff', marginTop: '4px' }}>
-                  {user.stats.gamesPlayed} เกม
+                  {user.stats?.gamesPlayed || 0} เกม
                 </div>
               </div>
 
               <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '10px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.06)' }}>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>ชนะการแข่งขัน</div>
                 <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--primary-gold)', marginTop: '4px' }}>
-                  {user.stats.gamesWon} ครั้ง
+                  {user.stats?.gamesWon || 0} ครั้ง
                 </div>
               </div>
 
@@ -316,7 +362,7 @@ export const UserProfileModal: React.FC<Props> = ({
                   <span>ตอบคำถามบาลีถูกต้อง</span>
                 </div>
                 <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#fff', marginTop: '6px' }}>
-                  {user.stats.correctAnswers} / {user.stats.totalAnswers} ข้อ
+                  {user.stats?.correctAnswers || 0} / {user.stats?.totalAnswers || 0} ข้อ
                   <span style={{ fontSize: '0.8rem', color: 'var(--accent-gold)', marginLeft: '8px' }}>
                     ({accuracyRate}%)
                   </span>
@@ -329,7 +375,7 @@ export const UserProfileModal: React.FC<Props> = ({
                   <span>ผ่านการสอบใหญ่ (Exam)</span>
                 </div>
                 <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#fff', marginTop: '6px' }}>
-                  {user.stats.examsPassed} ครั้ง
+                  {user.stats?.examsPassed || 0} ครั้ง
                 </div>
               </div>
 
@@ -339,7 +385,7 @@ export const UserProfileModal: React.FC<Props> = ({
                   <span>สำนักเรียนที่ครอบครอง</span>
                 </div>
                 <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#fff', marginTop: '6px' }}>
-                  {user.stats.propertiesBought} แห่ง
+                  {user.stats?.propertiesBought || 0} แห่ง
                 </div>
               </div>
 
@@ -349,7 +395,7 @@ export const UserProfileModal: React.FC<Props> = ({
                   <span>แต้มปัญญารวมที่เคยได้</span>
                 </div>
                 <div style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--accent-gold)', marginTop: '6px' }}>
-                  💡 {user.stats.totalWisdomEarned.toLocaleString()}
+                  💡 {(user.stats?.totalWisdomEarned || 0).toLocaleString()}
                 </div>
               </div>
             </div>
@@ -364,6 +410,7 @@ export const UserProfileModal: React.FC<Props> = ({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
+                marginBottom: '16px',
               }}
             >
               <div>
@@ -387,6 +434,26 @@ export const UserProfileModal: React.FC<Props> = ({
                 {totalDeckCount > 0 ? Math.round((masteredVocabCount / totalDeckCount) * 100) : 100}% แม่นยำ
               </span>
             </div>
+
+            {/* Open Leaderboard Button */}
+            {onOpenLeaderboard && (
+              <button
+                onClick={() => {
+                  onClose();
+                  onOpenLeaderboard();
+                }}
+                className="gold-button"
+                style={{
+                  width: '100%',
+                  justifyContent: 'center',
+                  padding: '12px',
+                  background: 'linear-gradient(135deg, #ef4444 0%, #f59e0b 50%, #d4af37 100%)',
+                }}
+              >
+                <Trophy size={18} />
+                ดูทำเนียบจัดอันดับผู้ชนะต่อเนื่อง (Leaderboard)
+              </button>
+            )}
           </div>
         )}
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Volume2, VolumeX, BookOpen, RefreshCw, LogIn } from 'lucide-react';
+import { Volume2, VolumeX, BookOpen, RefreshCw, LogIn, Trophy } from 'lucide-react';
 import type { GameState } from '../types/game';
 import type { UserAccount } from '../types/auth';
 
@@ -12,6 +12,7 @@ interface Props {
   isMuted: boolean;
   onOpenAuthModal: () => void;
   onOpenProfileModal: () => void;
+  onOpenLeaderboard: () => void;
 }
 
 export const GameHeader: React.FC<Props> = ({
@@ -23,6 +24,7 @@ export const GameHeader: React.FC<Props> = ({
   isMuted,
   onOpenAuthModal,
   onOpenProfileModal,
+  onOpenLeaderboard,
 }) => {
   const currentTurnPlayer = gameState.players[gameState.currentTurnPlayerIndex];
   const dueReviewsCount = gameState.reviewItems.filter((i) => !i.mastered).length;
@@ -88,7 +90,7 @@ export const GameHeader: React.FC<Props> = ({
                   </span>
                 </div>
                 <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                  {currentUser.rankTitle}
+                  {currentUser.rankTitle} {currentUser.stats?.currentWinStreak ? `🔥${currentUser.stats.currentWinStreak}` : ''}
                 </div>
               </div>
             </button>
@@ -103,6 +105,17 @@ export const GameHeader: React.FC<Props> = ({
               <span>เข้าสู่ระบบ / สมาชิก</span>
             </button>
           )}
+
+          {/* Leaderboard Button */}
+          <button
+            onClick={onOpenLeaderboard}
+            className="secondary-button"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+            title="ดูทำเนียบจัดอันดับผู้ชนะต่อเนื่อง"
+          >
+            <Trophy size={18} color="#f59e0b" />
+            <span style={{ fontSize: '0.85rem' }}>จัดอันดับ</span>
+          </button>
 
           <button
             onClick={onOpenNotebook}

@@ -3,6 +3,8 @@ import type { ReviewItem, CharacterId } from './game';
 export interface UserStats {
   gamesPlayed: number;
   gamesWon: number;
+  currentWinStreak: number;
+  maxWinStreak: number;
   correctAnswers: number;
   totalAnswers: number;
   propertiesBought: number;
@@ -52,6 +54,18 @@ export const ACHIEVEMENTS_LIST: Achievement[] = [
     title: 'มหาเปรียญป้ายแดง',
     description: 'ชนะเกมบาลีส่วนฐีเป็นครั้งแรก',
     icon: '🏆',
+  },
+  {
+    id: 'streak_3',
+    title: 'ไตรสิกขากล้าแกร่ง',
+    description: 'ชนะการแข่งขันต่อเนื่อง 3 เกมติดต่อกัน',
+    icon: '🔥',
+  },
+  {
+    id: 'streak_5',
+    title: 'มหาเปรียญไร้พ่าย',
+    description: 'ชนะการแข่งขันต่อเนื่อง 5 เกมติดต่อกัน',
+    icon: '⚡',
   },
   {
     id: 'scholar_10',
