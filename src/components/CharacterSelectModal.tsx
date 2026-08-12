@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { CHARACTERS } from '../data/charactersData';
 import type { Character, GameMode } from '../types/game';
 import type { UserAccount } from '../types/auth';
-import { Play, Users, Bot, LogIn, Sparkles } from 'lucide-react';
+import { Play, Users, Bot, LogIn, Sparkles, Trophy, Flame } from 'lucide-react';
+import { getLeaderboardAccounts } from '../utils/authService';
 
 export interface PlayerSetupConfig {
   name: string;
@@ -14,12 +15,14 @@ interface Props {
   onStartGame: (playersConfig: PlayerSetupConfig[], mode: GameMode, rounds: number) => void;
   currentUser?: UserAccount | null;
   onOpenAuthModal?: () => void;
+  onOpenLeaderboard?: () => void;
 }
 
 export const CharacterSelectModal: React.FC<Props> = ({
   onStartGame,
   currentUser,
   onOpenAuthModal,
+  onOpenLeaderboard,
 }) => {
   const [playType, setPlayType] = useState<'ai' | 'pass_play'>('pass_play');
 
@@ -102,6 +105,8 @@ export const CharacterSelectModal: React.FC<Props> = ({
     onStartGame(setupConfigs, gameMode, rounds);
   };
 
+  const topStreaks = getLeaderboardAccounts('streak').slice(0, 3);
+
   return (
     <div className="modal-overlay">
       <div
@@ -134,7 +139,7 @@ export const CharacterSelectModal: React.FC<Props> = ({
               border: '1px solid var(--primary-gold)',
               borderRadius: '12px',
               padding: '10px 16px',
-              marginBottom: '18px',
+              marginBottom: '14px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
@@ -147,7 +152,7 @@ export const CharacterSelectModal: React.FC<Props> = ({
                   เข้าสู่ระบบในชื่อ: <span style={{ color: 'var(--primary-gold)' }}>{currentUser.displayName}</span>
                 </div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--accent-gold)' }}>
-                  Lv.{currentUser.level} • {currentUser.rankTitle} (ผลการเล่นจะถูกบันทึกเข้าบัญชีนี้)
+                  Lv.{currentUser.level} • {currentUser.rankTitle} {currentUser.stats?.currentWinStreak ? `(🔥 ชนะ ${currentUser.stats.currentWinStreak} ตาติด)` : ''}
                 </div>
               </div>
             </div>
@@ -176,7 +181,7 @@ export const CharacterSelectModal: React.FC<Props> = ({
               border: '1px dashed rgba(212, 175, 55, 0.4)',
               borderRadius: '12px',
               padding: '10px 16px',
-              marginBottom: '18px',
+              marginBottom: '14px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
@@ -200,6 +205,79 @@ export const CharacterSelectModal: React.FC<Props> = ({
           </div>
         )}
 
+        {/* Top 3 Win Streak Leaderboard Preview Banner in Lobby */}
+        <div
+          style={{
+            background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(245, 158, 11, 0.15), rgba(16, 25, 50, 0.8))',
+            border: '1px solid rgba(245, 158, 11, 0.4)',
+            borderRadius: '14px',
+            padding: '12px 16px',
+            marginBottom: '18px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Trophy size={18} color="var(--primary-gold)" />
+              <span style={{ fontWeight: 700, fontSize: '0.85rem', color: '#fff' }}>
+                ทำเนียบผู้ชนะต่อเนื่องสูงสุด 🔥
+              </span>
+            </div>
+            {onOpenLeaderboard && (
+              <button
+                onClick={onOpenLeaderboard}
+                style={{
+                  background: 'rgba(255,255,255,0.08)',
+                  border: '1px solid rgba(212,175,55,0.3)',
+                  color: 'var(--primary-gold)',
+                  borderRadius: '6px',
+                  padding: '3px 10px',
+                  fontSize: '0.75rem',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+              >
+                <Trophy size={12} />
+                ดูอันดับทั้งหมด
+              </button>
+            )}
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+            {topStreaks.map((acc, idx) => (
+              <div
+                key={acc.id}
+                onClick={onOpenLeaderboard}
+                style={{
+                  background: 'rgba(0,0,0,0.35)',
+                  border: idx === 0 ? '1px solid var(--primary-gold)' : '1px solid rgba(255,255,255,0.06)',
+                  borderRadius: '8px',
+                  padding: '8px 10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  cursor: 'pointer',
+                  transition: 'transform 0.2s',
+                }}
+              >
+                <div style={{ fontSize: '1.4rem' }}>{acc.avatar}</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: idx === 0 ? 'var(--primary-gold)' : '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {idx === 0 ? '👑 ' : idx === 1 ? '🥈 ' : '🥉 '}
+                    {acc.displayName}
+                  </div>
+                  <div style={{ fontSize: '0.68rem', color: '#fca5a5', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '2px' }}>
+                    <Flame size={10} color="#ef4444" />
+                    <span>ชนะ {acc.stats?.currentWinStreak || 0} ตาติด</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '20px' }}>
           <button
             onClick={() => setPlayType('pass_play')}
@@ -217,9 +295,10 @@ export const CharacterSelectModal: React.FC<Props> = ({
               gap: '8px',
             }}
           >
-            <Users size={18} color="var(--primary-gold)" />
+            <Users size={18} />
             เล่นหลายคน (Pass & Play)
           </button>
+
           <button
             onClick={() => setPlayType('ai')}
             style={{
@@ -236,141 +315,164 @@ export const CharacterSelectModal: React.FC<Props> = ({
               gap: '8px',
             }}
           >
-            <Bot size={18} color="#3b82f6" />
+            <Bot size={18} />
             เล่นคนเดียว (สู้กับ AI)
           </button>
         </div>
 
         {playType === 'pass_play' ? (
-          <div style={{ marginBottom: '20px' }}>
-            <h3 style={{ fontSize: '0.9rem', color: 'var(--primary-gold)', marginBottom: '10px' }}>
-              👥 จำนวนผู้เล่น (2 - 4 คน):
-            </h3>
-            <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
-              {[2, 3, 4].map((count) => (
-                <button
-                  key={count}
-                  onClick={() => setHumanPlayerCount(count)}
-                  className="secondary-button"
-                  style={{
-                    flex: 1,
-                    background: humanPlayerCount === count ? 'var(--primary-gold)' : 'rgba(255,255,255,0.05)',
-                    color: humanPlayerCount === count ? '#000' : '#fff',
-                    fontWeight: 700,
-                  }}
-                >
-                  {count} คน
-                </button>
-              ))}
+          <div>
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                จำนวนผู้เล่น:
+              </label>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                {[2, 3, 4].map((count) => (
+                  <button
+                    key={count}
+                    onClick={() => setHumanPlayerCount(count)}
+                    style={{
+                      flex: 1,
+                      padding: '8px',
+                      borderRadius: '8px',
+                      border: `1px solid ${humanPlayerCount === count ? 'var(--primary-gold)' : 'rgba(255,255,255,0.1)'}`,
+                      background: humanPlayerCount === count ? 'var(--primary-gold)' : 'rgba(255,255,255,0.05)',
+                      color: humanPlayerCount === count ? '#090e1a' : '#fff',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {count} คน
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
               {Array.from({ length: humanPlayerCount }).map((_, idx) => (
                 <div
                   key={idx}
                   style={{
-                    background: 'rgba(0,0,0,0.3)',
+                    background: 'rgba(255,255,255,0.03)',
                     padding: '12px',
                     borderRadius: '10px',
-                    border: '1px solid rgba(255,255,255,0.1)',
+                    border: '1px solid rgba(255,255,255,0.06)',
                   }}
                 >
-                  <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
-                    ชื่อผู้เล่นคนที่ {idx + 1}:
-                    {idx === 0 && currentUser && (
-                      <span style={{ color: 'var(--primary-gold)', marginLeft: '6px' }}>
-                        (บัญชีของคุณ: {currentUser.displayName})
-                      </span>
-                    )}
-                  </label>
-                  <input
-                    type="text"
-                    value={multiplayerConfig[idx].name}
-                    onChange={(e) => handleMultiNameChange(idx, e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      borderRadius: '6px',
-                      background: 'rgba(255,255,255,0.08)',
-                      border: '1px solid rgba(255,255,255,0.15)',
-                      color: '#fff',
-                      fontSize: '0.85rem',
-                      marginBottom: '10px',
-                    }}
-                  />
-
-                  <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
-                    เลือกอาชีพ:
-                  </label>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
-                    {CHARACTERS.map((char) => (
-                      <button
-                        key={char.id}
-                        onClick={() => handleMultiCharChange(idx, char.id)}
+                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                        ชื่อผู้เล่น {idx + 1}:
+                      </label>
+                      <input
+                        type="text"
+                        value={multiplayerConfig[idx].name}
+                        onChange={(e) => handleMultiNameChange(idx, e.target.value)}
+                        placeholder={`ผู้เล่น ${idx + 1}`}
                         style={{
-                          padding: '6px',
+                          width: '100%',
+                          padding: '8px 12px',
                           borderRadius: '6px',
-                          border: `1px solid ${multiplayerConfig[idx].charId === char.id ? 'var(--primary-gold)' : 'rgba(255,255,255,0.1)'}`,
-                          background: multiplayerConfig[idx].charId === char.id ? 'rgba(212,175,55,0.2)' : 'rgba(255,255,255,0.03)',
+                          background: 'rgba(0,0,0,0.3)',
+                          border: '1px solid rgba(255,255,255,0.1)',
                           color: '#fff',
-                          fontSize: '0.75rem',
-                          cursor: 'pointer',
-                          textAlign: 'center',
                         }}
-                      >
-                        <div style={{ fontSize: '1.2rem' }}>{char.avatar}</div>
-                        <div style={{ fontSize: '0.65rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {char.name.split(' ')[0]}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ marginTop: '8px' }}>
+                    <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                      เลือกตัวละคร:
+                    </label>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
+                      {CHARACTERS.map((char) => (
+                        <div
+                          key={char.id}
+                          onClick={() => handleMultiCharChange(idx, char.id)}
+                          style={{
+                            padding: '6px',
+                            borderRadius: '6px',
+                            border: `1px solid ${multiplayerConfig[idx].charId === char.id ? 'var(--primary-gold)' : 'rgba(255,255,255,0.05)'}`,
+                            background: multiplayerConfig[idx].charId === char.id ? 'rgba(212, 175, 55, 0.2)' : 'rgba(0,0,0,0.2)',
+                            cursor: 'pointer',
+                            textAlign: 'center',
+                          }}
+                        >
+                          <div style={{ fontSize: '1.4rem' }}>{char.avatar}</div>
+                          <div style={{ fontSize: '0.7rem', color: '#fff', marginTop: '2px' }}>{char.name}</div>
                         </div>
-                      </button>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
           </div>
         ) : (
-          <div style={{ marginBottom: '20px' }}>
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
+          <div>
+            <div style={{ background: 'rgba(255,255,255,0.03)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.06)', marginBottom: '16px' }}>
+              <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '6px' }}>
                 ชื่อของคุณ:
-                {currentUser && (
-                  <span style={{ color: 'var(--primary-gold)', marginLeft: '6px' }}>
-                    (บัญชีของคุณ: {currentUser.displayName})
-                  </span>
-                )}
               </label>
               <input
                 type="text"
                 value={singlePlayerName}
                 onChange={(e) => setSinglePlayerName(e.target.value)}
+                placeholder="ระบุชื่อของคุณ"
                 style={{
                   width: '100%',
-                  padding: '10px 14px',
-                  borderRadius: '8px',
-                  background: 'rgba(255,255,255,0.08)',
-                  border: '1px solid rgba(255,255,255,0.15)',
+                  padding: '8px 12px',
+                  borderRadius: '6px',
+                  background: 'rgba(0,0,0,0.3)',
+                  border: '1px solid rgba(255,255,255,0.1)',
                   color: '#fff',
-                  fontSize: '0.9rem',
+                  marginBottom: '12px',
                 }}
               />
+
+              <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '6px' }}>
+                เลือกตัวละครของคุณ:
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                {CHARACTERS.map((char) => (
+                  <div
+                    key={char.id}
+                    onClick={() => setSingleCharId(char.id)}
+                    style={{
+                      padding: '10px 6px',
+                      borderRadius: '8px',
+                      border: `1px solid ${singleCharId === char.id ? 'var(--primary-gold)' : 'rgba(255,255,255,0.05)'}`,
+                      background: singleCharId === char.id ? 'rgba(212, 175, 55, 0.2)' : 'rgba(0,0,0,0.2)',
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                    }}
+                  >
+                    <div style={{ fontSize: '1.8rem' }}>{char.avatar}</div>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#fff', marginTop: '4px' }}>{char.name}</div>
+                  </div>
+                ))}
+              </div>
             </div>
 
-            <div style={{ marginBottom: '16px' }}>
-              <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
-                จำนวน AI คู่แข่ง (1 - 3 ตัว):
+            <div style={{ marginBottom: '20px' }}>
+              <label style={{ display: 'block', fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                จำนวน AI คู่แข่ง:
               </label>
               <div style={{ display: 'flex', gap: '10px' }}>
                 {[1, 2, 3].map((count) => (
                   <button
                     key={count}
                     onClick={() => setAiCount(count)}
-                    className="secondary-button"
                     style={{
                       flex: 1,
+                      padding: '8px',
+                      borderRadius: '8px',
+                      border: `1px solid ${aiCount === count ? 'var(--primary-gold)' : 'rgba(255,255,255,0.1)'}`,
                       background: aiCount === count ? 'var(--primary-gold)' : 'rgba(255,255,255,0.05)',
-                      color: aiCount === count ? '#000' : '#fff',
+                      color: aiCount === count ? '#090e1a' : '#fff',
                       fontWeight: 700,
+                      cursor: 'pointer',
                     }}
                   >
                     {count} ตัว
@@ -378,48 +480,17 @@ export const CharacterSelectModal: React.FC<Props> = ({
                 ))}
               </div>
             </div>
-
-            <div>
-              <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
-                เลือกอาชีพของคุณ:
-              </label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
-                {CHARACTERS.map((char) => (
-                  <div
-                    key={char.id}
-                    onClick={() => setSingleCharId(char.id)}
-                    style={{
-                      padding: '12px',
-                      borderRadius: '10px',
-                      border: `2px solid ${singleCharId === char.id ? 'var(--primary-gold)' : 'rgba(255,255,255,0.1)'}`,
-                      background: singleCharId === char.id ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                      <span style={{ fontSize: '1.4rem' }}>{char.avatar}</span>
-                      <strong style={{ fontSize: '0.85rem', color: 'var(--primary-gold)' }}>{char.name}</strong>
-                    </div>
-                    <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: 0 }}>
-                      {char.skillDescription}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
         )}
 
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
-          <button
-            onClick={handleStart}
-            className="gold-button pulse-active"
-            style={{ width: '100%', padding: '14px', justifyContent: 'center', fontSize: '1.1rem' }}
-          >
-            <Play size={20} />
-            เริ่มเข้าสู่กระดานบาลีส่วนฐี
-          </button>
-        </div>
+        <button
+          onClick={handleStart}
+          className="gold-button"
+          style={{ width: '100%', padding: '14px', fontSize: '1.1rem', justifyContent: 'center' }}
+        >
+          <Play size={20} />
+          เริ่มการแข่งขันบาลี
+        </button>
       </div>
     </div>
   );

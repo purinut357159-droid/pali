@@ -727,6 +727,7 @@ export const App: React.FC = () => {
             setAuthModalTab('login');
             setShowAuthModal(true);
           }}
+          onOpenLeaderboard={() => setShowLeaderboardModal(true)}
         />
       )}
 
