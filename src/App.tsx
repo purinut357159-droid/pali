@@ -390,7 +390,7 @@ export const App: React.FC = () => {
     });
   };
 
-  const handleAnswerQuiz = (isCorrect: boolean) => {
+  const handleAnswerQuiz = (isCorrect: boolean, speedBonus: number = 0, timeTaken: number = 0) => {
     if (!activeQuiz) return;
     const { question, targetTile, mode } = activeQuiz;
 
@@ -403,17 +403,21 @@ export const App: React.FC = () => {
 
       if (isCorrect) {
         p.stats.correctAnswers += 1;
-        addLog(`${p.name} ตอบคำถามบาลีถูกต้อง! (สาธุ)`, 'success');
 
         if (mode === 'buy' && targetTile && targetTile.price && p.wisdomPoints >= targetTile.price) {
-          p.wisdomPoints -= targetTile.price;
+          p.wisdomPoints = p.wisdomPoints - targetTile.price + speedBonus;
           p.ownedProperties.push(targetTile.id);
           p.stats.propertiesBought += 1;
 
           const updatedTiles = prev.tiles.map((t) =>
             t.id === targetTile.id ? { ...t, ownerId: p.id, upgradeLevel: 0 as const } : t
           );
-          addLog(`${p.name} ครอบครองวิชา "${targetTile.name}" สำเร็จ!`, 'success');
+          
+          if (speedBonus > 0) {
+            addLog(`✨ ${p.name} ตอบถูกใน ${timeTaken > 0 ? timeTaken.toFixed(1) + ' วิ' : 'เวลาจำกัด'}! รับโบนัสความเร็ว +${speedBonus} แต้มปัญญา และครอบครองวิชา "${targetTile.name}" สำเร็จ!`, 'success');
+          } else {
+            addLog(`${p.name} ครอบครองวิชา "${targetTile.name}" สำเร็จ!`, 'success');
+          }
           return { ...prev, players: updatedPlayers, tiles: updatedTiles };
         } else if (mode === 'rent' && targetTile) {
           const owner = prev.players.find((item) => item.id === targetTile.ownerId);
@@ -427,18 +431,29 @@ export const App: React.FC = () => {
             }
 
             const discountedRent = Math.floor(baseRent * 0.5);
-            p.wisdomPoints -= discountedRent;
+            p.wisdomPoints = p.wisdomPoints - discountedRent + speedBonus;
             owner.wisdomPoints += discountedRent;
-            addLog(`${p.name} ตอบถูก! จ่ายค่าผ่านทางเพียงครึ่งเดียว (${discountedRent} แต้ม)`, 'info');
+
+            if (speedBonus > 0) {
+              addLog(`✨ ${p.name} ตอบถูกใน ${timeTaken > 0 ? timeTaken.toFixed(1) + ' วิ' : 'เวลาจำกัด'}! ได้รับโบนัสความเร็ว +${speedBonus} แต้มปัญญา และจ่ายค่าผ่านทางเพียงครึ่งเดียว (${discountedRent} แต้ม)`, 'info');
+            } else {
+              addLog(`${p.name} ตอบถูก! จ่ายค่าผ่านทางเพียงครึ่งเดียว (${discountedRent} แต้ม)`, 'info');
+            }
           }
         } else if (mode === 'quiz' || mode === 'exam') {
-          const reward = mode === 'exam' ? 300 : 150;
-          p.wisdomPoints += reward;
+          const baseReward = mode === 'exam' ? 300 : 150;
+          const totalReward = baseReward + speedBonus;
+          p.wisdomPoints += totalReward;
           if (mode === 'exam') p.stats.examsPassed += 1;
-          addLog(`${p.name} ผ่านการสอบ รับโบนัสแต้มปัญญา +${reward} แต้ม!`, 'success');
+
+          if (speedBonus > 0) {
+            addLog(`🏆 ${p.name} ตอบคำถามสำเร็จใน ${timeTaken > 0 ? timeTaken.toFixed(1) + ' วิ' : 'เวลาจำกัด'}! รับแต้มปัญญาฐาน +${baseReward} และโบนัสความเร็ว +${speedBonus} (รวม +${totalReward} แต้ม)!`, 'success');
+          } else {
+            addLog(`${p.name} ผ่านการสอบ รับโบนัสแต้มปัญญา +${totalReward} แต้ม!`, 'success');
+          }
         }
       } else {
-        addLog(`${p.name} ตอบคำถามบาลีไม่ถูกต้อง`, 'danger');
+        addLog(`${p.name} ตอบคำถามบาลีไม่ถูกต้อง หรือหมดเวลา`, 'danger');
         newReviewItems = addWrongQuestionToSRS(prev.reviewItems, question);
 
         if (currentUser) {
@@ -603,9 +618,12 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     if (activeQuiz && gameState.players[gameState.currentTurnPlayerIndex]?.isAi) {
+      const randomSeconds = +(Math.random() * 4 + 2.5).toFixed(1);
+      const isCorrect = Math.random() < 0.75;
+      const speedBonus = isCorrect ? Math.max(10, Math.round((15 - randomSeconds) * 10)) : 0;
+
       const timer = setTimeout(() => {
-        const isCorrect = Math.random() < 0.75;
-        handleAnswerQuiz(isCorrect);
+        handleAnswerQuiz(isCorrect, speedBonus, randomSeconds);
       }, 1200);
       return () => clearTimeout(timer);
     }
@@ -738,7 +756,7 @@ export const App: React.FC = () => {
           title={activeQuiz.title}
           onAnswer={handleAnswerQuiz}
           canUseFreeCard={currentPlayer.freeAnswerCards > 0}
-          onUseFreeCard={() => handleAnswerQuiz(true)}
+          onUseFreeCard={() => handleAnswerQuiz(true, 150, 0.5)}
         />
       )}
 

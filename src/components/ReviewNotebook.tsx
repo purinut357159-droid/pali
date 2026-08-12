@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { ReviewItem } from '../types/game';
 import { BookOpen, X, Sparkles } from 'lucide-react';
 import { audioManager } from '../utils/audioManager';
@@ -13,19 +13,52 @@ export const ReviewNotebook: React.FC<Props> = ({ reviewItems, onClose, onMaster
   const [selectedItem, setSelectedItem] = useState<ReviewItem | null>(null);
   const [userChoice, setUserChoice] = useState<number | null>(null);
   const [isAnswered, setIsAnswered] = useState<boolean>(false);
+  const [timeLeft, setTimeLeft] = useState<number>(15);
+  const [timeTaken, setTimeTaken] = useState<number>(0);
+  const [isTimeout, setIsTimeout] = useState<boolean>(false);
 
   const activeItems = reviewItems.filter((item) => !item.mastered);
   const masteredItems = reviewItems.filter((item) => item.mastered);
+
+  // Review question timer
+  useEffect(() => {
+    if (!selectedItem || isAnswered) return;
+
+    setTimeLeft(15);
+    setIsTimeout(false);
+
+    const interval = setInterval(() => {
+      setTimeLeft((prev) => {
+        const next = Math.max(0, +(prev - 0.1).toFixed(1));
+        if (next <= 0) {
+          clearInterval(interval);
+          setIsAnswered(true);
+          setIsTimeout(true);
+          setTimeTaken(15);
+          audioManager.playTimeoutSound();
+          return 0;
+        }
+        return next;
+      });
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [selectedItem, isAnswered]);
 
   const handleTestQuestion = (item: ReviewItem) => {
     setSelectedItem(item);
     setUserChoice(null);
     setIsAnswered(false);
+    setIsTimeout(false);
+    setTimeLeft(15);
+    setTimeTaken(0);
   };
 
   const handleSelectOption = (index: number) => {
     if (!selectedItem || isAnswered) return;
+    const taken = +(15 - timeLeft).toFixed(1);
     setUserChoice(index);
+    setTimeTaken(taken);
     setIsAnswered(true);
 
     if (index === selectedItem.question.correctAnswer) {
@@ -34,6 +67,13 @@ export const ReviewNotebook: React.FC<Props> = ({ reviewItems, onClose, onMaster
     } else {
       audioManager.playTempleBell();
     }
+  };
+
+  const getSpeedGrade = (sec: number) => {
+    if (sec <= 3.5) return { label: 'สายฟ้าแลบ ⚡', color: '#f59e0b' };
+    if (sec <= 7.0) return { label: 'รวดเร็วมาก 🚀', color: '#06b6d4' };
+    if (sec <= 11.0) return { label: 'ฉับไว 🎯', color: '#10b981' };
+    return { label: 'ทันเวลา ⏱️', color: '#94a3b8' };
   };
 
   return (
@@ -58,7 +98,7 @@ export const ReviewNotebook: React.FC<Props> = ({ reviewItems, onClose, onMaster
                 สมุดทบทวนบาลี (Spaced Repetition)
               </h2>
               <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', margin: 0 }}>
-                ทบทวนศัพท์และไวยากรณ์ที่เคยตอบผิด เพื่อความเชี่ยวชาญอย่างเป็นระบบ
+                ทบทวนศัพท์และไวยากรณ์ที่เคยตอบผิด พร้อมระบบจับเวลาฝึกความแม่นยำ
               </p>
             </div>
           </div>
@@ -100,6 +140,34 @@ export const ReviewNotebook: React.FC<Props> = ({ reviewItems, onClose, onMaster
               </button>
             </div>
 
+            {/* Timer Bar for Review */}
+            <div style={{ marginBottom: '14px', background: 'rgba(0,0,0,0.4)', padding: '8px 12px', borderRadius: '8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: '4px' }}>
+                <span style={{ color: timeLeft <= 4 ? '#ef4444' : '#f8f9fa' }}>
+                  {isAnswered
+                    ? isTimeout
+                      ? '⌛ หมดเวลา'
+                      : `⏱️ เวลาที่ใช้: ${timeTaken.toFixed(1)} วินาที`
+                    : `⏱️ เวลาที่เหลือ: ${timeLeft.toFixed(1)} วิ`}
+                </span>
+                {isAnswered && userChoice === selectedItem.question.correctAnswer && (
+                  <span style={{ color: getSpeedGrade(timeTaken).color, fontWeight: 700 }}>
+                    {getSpeedGrade(timeTaken).label}
+                  </span>
+                )}
+              </div>
+              <div style={{ height: '6px', width: '100%', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
+                <div
+                  style={{
+                    height: '100%',
+                    width: `${(timeLeft / 15) * 100}%`,
+                    background: timeLeft <= 4 ? '#ef4444' : timeLeft <= 8 ? '#f59e0b' : '#10b981',
+                    transition: 'width 0.1s linear',
+                  }}
+                />
+              </div>
+            </div>
+
             {selectedItem.question.paliVocab && (
               <div style={{ textAlign: 'center', fontSize: '1.5rem', fontWeight: 700, color: '#fff', marginBottom: '12px' }}>
                 {selectedItem.question.paliVocab}
@@ -139,7 +207,18 @@ export const ReviewNotebook: React.FC<Props> = ({ reviewItems, onClose, onMaster
 
             {isAnswered && (
               <div style={{ padding: '10px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', fontSize: '0.85rem' }}>
-                <strong>คำอธิบาย:</strong> {selectedItem.question.explanation}
+                <div>
+                  <strong style={{ color: userChoice === selectedItem.question.correctAnswer ? '#4ade80' : '#f87171' }}>
+                    {isTimeout
+                      ? '⏰ หมดเวลา!'
+                      : userChoice === selectedItem.question.correctAnswer
+                      ? '✨ ถูกต้อง! เชี่ยวชาญวิชานี้แล้ว'
+                      : '❌ ตอบผิด!'}
+                  </strong>
+                </div>
+                <div style={{ marginTop: '4px' }}>
+                  <strong>คำอธิบาย:</strong> {selectedItem.question.explanation}
+                </div>
               </div>
             )}
           </div>

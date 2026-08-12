@@ -138,6 +138,28 @@ body {
   box-shadow: 0 0 20px #f59e0b !important;
 }
 
+/* Quiz Timer & Speed Bonus Styles */
+@keyframes timerPulseWarning {
+  0%, 100% { box-shadow: 0 0 8px rgba(239, 68, 68, 0.5); transform: scale(1); }
+  50% { box-shadow: 0 0 20px rgba(239, 68, 68, 0.9); transform: scale(1.02); }
+}
+
+@keyframes speedShimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.timer-warning {
+  animation: timerPulseWarning 0.8s infinite ease-in-out;
+  border-color: #ef4444 !important;
+}
+
+.shimmer-badge {
+  background: linear-gradient(90deg, rgba(212,175,55,0.2) 0%, rgba(255,255,255,0.4) 50%, rgba(212,175,55,0.2) 100%);
+  background-size: 200% 100%;
+  animation: speedShimmer 2.5s infinite linear;
+}
+
 /* Modal Overlay */
 .modal-overlay {
   position: fixed;

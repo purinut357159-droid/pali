@@ -1,16 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { Question, Player } from '../types/game';
-import { CheckCircle2, XCircle, Sparkles } from 'lucide-react';
+import { CheckCircle2, XCircle, Sparkles, Timer, Zap } from 'lucide-react';
 import { audioManager } from '../utils/audioManager';
 
 interface Props {
   question: Question;
   player: Player;
   title: string;
-  onAnswer: (isCorrect: boolean) => void;
+  onAnswer: (isCorrect: boolean, speedBonus: number, timeTaken: number) => void;
   canUseFreeCard?: boolean;
   onUseFreeCard?: () => void;
 }
+
+const TOTAL_TIME = 15; // 15 seconds limit
 
 export const QuizModal: React.FC<Props> = ({
   question,
@@ -20,15 +22,71 @@ export const QuizModal: React.FC<Props> = ({
   canUseFreeCard,
   onUseFreeCard,
 }) => {
+  const [timeLeft, setTimeLeft] = useState<number>(TOTAL_TIME);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [isAnswered, setIsAnswered] = useState<boolean>(false);
+  const [isTimeout, setIsTimeout] = useState<boolean>(false);
+  const [timeTaken, setTimeTaken] = useState<number>(0);
+  const [earnedBonus, setEarnedBonus] = useState<number>(0);
+  const lastTickSecond = useRef<number>(TOTAL_TIME);
+
+  // Speed multiplier based on player character skill
+  const charMultiplier = player.character.id === 'teacher' ? 1.5 : (player.character.id === 'novice' ? 1.2 : 1.0);
+
+  const calculateSpeedBonus = (remaining: number) => {
+    const base = Math.max(10, Math.round(remaining * 10));
+    return Math.round(base * charMultiplier);
+  };
+
+  const currentLiveBonus = calculateSpeedBonus(timeLeft);
+
+  // Countdown timer effect
+  useEffect(() => {
+    if (isAnswered) return;
+
+    const interval = setInterval(() => {
+      setTimeLeft((prev) => {
+        const next = Math.max(0, +(prev - 0.1).toFixed(1));
+
+        // Soft tick sound for last 4 seconds
+        const currentInt = Math.ceil(next);
+        if (next <= 4.0 && next > 0 && currentInt !== lastTickSecond.current) {
+          lastTickSecond.current = currentInt;
+          audioManager.playTickSound();
+        }
+
+        if (next <= 0) {
+          clearInterval(interval);
+          handleTimeout();
+          return 0;
+        }
+        return next;
+      });
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [isAnswered]);
+
+  const handleTimeout = () => {
+    if (isAnswered) return;
+    setIsAnswered(true);
+    setIsTimeout(true);
+    setTimeTaken(TOTAL_TIME);
+    setEarnedBonus(0);
+    audioManager.playTimeoutSound();
+  };
 
   const handleSelectOption = (index: number) => {
     if (isAnswered) return;
-    setSelectedIndex(index);
-    setIsAnswered(true);
+    const taken = +(TOTAL_TIME - timeLeft).toFixed(1);
     const correct = index === question.correctAnswer;
-    
+    const bonus = correct ? calculateSpeedBonus(timeLeft) : 0;
+
+    setSelectedIndex(index);
+    setTimeTaken(taken);
+    setEarnedBonus(bonus);
+    setIsAnswered(true);
+
     if (correct) {
       audioManager.playSathuChime();
     } else {
@@ -36,28 +94,69 @@ export const QuizModal: React.FC<Props> = ({
     }
   };
 
+  const handleUseFreeCardLocal = () => {
+    if (isAnswered) return;
+    const bonus = calculateSpeedBonus(TOTAL_TIME); // max bonus
+    setIsAnswered(true);
+    setSelectedIndex(question.correctAnswer);
+    setTimeTaken(0.5);
+    setEarnedBonus(bonus);
+    audioManager.playSathuChime();
+
+    if (onUseFreeCard) {
+      onUseFreeCard();
+    }
+  };
+
   const handleConfirm = () => {
-    if (selectedIndex === null) return;
-    onAnswer(selectedIndex === question.correctAnswer);
+    const isCorrect = selectedIndex === question.correctAnswer && !isTimeout;
+    onAnswer(isCorrect, isCorrect ? earnedBonus : 0, timeTaken);
   };
 
   const renderStars = (level: number) => {
     return '⭐'.repeat(level);
   };
 
+  const getSpeedGrade = (seconds: number) => {
+    if (seconds <= 3.5) {
+      return { label: 'สายฟ้าแลบ (Lightning Fast)', icon: '⚡', color: '#f59e0b' };
+    }
+    if (seconds <= 7.0) {
+      return { label: 'รวดเร็วมาก (Super Fast)', icon: '🚀', color: '#06b6d4' };
+    }
+    if (seconds <= 11.0) {
+      return { label: 'ฉับไว (Quick Answer)', icon: '🎯', color: '#10b981' };
+    }
+    return { label: 'ทันเวลา (In Time)', icon: '⏱️', color: '#94a3b8' };
+  };
+
+  // Timer Bar Percentage & Color
+  const timerPercent = Math.min(100, Math.max(0, (timeLeft / TOTAL_TIME) * 100));
+  const isUrgent = timeLeft <= 4.0;
+  let barGradient = 'linear-gradient(90deg, #10b981, #d4af37)';
+  if (timeLeft <= 4.0) {
+    barGradient = 'linear-gradient(90deg, #ef4444, #dc2626)';
+  } else if (timeLeft <= 7.5) {
+    barGradient = 'linear-gradient(90deg, #f59e0b, #eab308)';
+  }
+
+  const speedGrade = getSpeedGrade(timeTaken);
+
   return (
     <div className="modal-overlay">
       <div
-        className="glass-panel"
+        className={`glass-panel ${isUrgent && !isAnswered ? 'timer-warning' : ''}`}
         style={{
           width: '100%',
-          maxWidth: '520px',
+          maxWidth: '540px',
           padding: '24px',
-          border: '2px solid var(--primary-gold)',
-          boxShadow: '0 0 30px rgba(212,175,55,0.3)',
+          border: isUrgent && !isAnswered ? '2px solid #ef4444' : '2px solid var(--primary-gold)',
+          boxShadow: isUrgent && !isAnswered ? '0 0 30px rgba(239,68,68,0.5)' : '0 0 30px rgba(212,175,55,0.3)',
+          transition: 'border 0.3s, box-shadow 0.3s',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+        {/* Header Bar */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
           <div>
             <span
               style={{
@@ -78,29 +177,114 @@ export const QuizModal: React.FC<Props> = ({
           <span style={{ fontSize: '1.8rem' }}>✍️</span>
         </div>
 
+        {/* Speed Timer Bar Container */}
+        <div
+          style={{
+            background: 'rgba(10, 17, 35, 0.8)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRadius: '12px',
+            padding: '10px 14px',
+            marginBottom: '16px',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', fontSize: '0.85rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: isUrgent && !isAnswered ? '#f87171' : '#f8f9fa', fontWeight: 600 }}>
+              <Timer size={16} color={isUrgent && !isAnswered ? '#ef4444' : 'var(--primary-gold)'} />
+              <span>
+                {isAnswered
+                  ? isTimeout
+                    ? '⌛ หมดเวลา'
+                    : `⏱️ ใช้เวลา: ${timeTaken.toFixed(1)} วิ`
+                  : `⏱️ เวลาที่เหลือ: ${timeLeft.toFixed(1)} วินาที`}
+              </span>
+            </div>
+
+            {!isAnswered ? (
+              <div
+                className="shimmer-badge"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  color: 'var(--primary-gold)',
+                  fontWeight: 700,
+                  fontSize: '0.82rem',
+                  padding: '2px 8px',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(212, 175, 55, 0.4)',
+                }}
+              >
+                <Zap size={14} color="#f59e0b" />
+                โบนัสความเร็ว: +{currentLiveBonus} แต้ม
+                {charMultiplier > 1 && (
+                  <span style={{ fontSize: '0.7rem', color: '#6ee7b7' }}>({charMultiplier}x)</span>
+                )}
+              </div>
+            ) : (
+              selectedIndex === question.correctAnswer && !isTimeout && (
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    color: '#4ade80',
+                    fontWeight: 700,
+                    fontSize: '0.85rem',
+                  }}
+                >
+                  <Zap size={14} color="#22c55e" />
+                  โบนัสตอบไว: +{earnedBonus} แต้ม!
+                </div>
+              )
+            )}
+          </div>
+
+          {/* Progress Bar Track */}
+          <div
+            style={{
+              width: '100%',
+              height: '8px',
+              background: 'rgba(255, 255, 255, 0.08)',
+              borderRadius: '4px',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                width: `${timerPercent}%`,
+                height: '100%',
+                background: barGradient,
+                borderRadius: '4px',
+                transition: 'width 0.1s linear, background 0.3s ease',
+              }}
+            />
+          </div>
+        </div>
+
         {question.paliVocab && (
           <div
             style={{
               background: 'linear-gradient(135deg, rgba(212, 175, 55, 0.15), rgba(16, 25, 50, 0.6))',
               border: '1px solid var(--primary-gold)',
               borderRadius: '12px',
-              padding: '12px 16px',
+              padding: '10px 16px',
               textAlign: 'center',
-              marginBottom: '16px',
+              marginBottom: '14px',
             }}
           >
-            <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>คำศัพท์บาลี:</span>
-            <div style={{ fontSize: '1.6rem', fontWeight: 700, color: '#ffffff', letterSpacing: '1px' }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>คำศัพท์บาลี:</span>
+            <div style={{ fontSize: '1.5rem', fontWeight: 700, color: '#ffffff', letterSpacing: '1px' }}>
               {question.paliVocab}
             </div>
           </div>
         )}
 
-        <p style={{ fontSize: '1rem', fontWeight: 500, marginBottom: '20px', lineHeight: 1.5, color: '#f8f9fa' }}>
+        <p style={{ fontSize: '1rem', fontWeight: 500, marginBottom: '16px', lineHeight: 1.5, color: '#f8f9fa' }}>
           {question.questionText}
         </p>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
+        {/* Options */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '18px' }}>
           {question.options.map((option, idx) => {
             let bgColor = 'rgba(255, 255, 255, 0.05)';
             let borderColor = 'rgba(255, 255, 255, 0.1)';
@@ -146,30 +330,88 @@ export const QuizModal: React.FC<Props> = ({
           })}
         </div>
 
+        {/* Result Breakdown */}
         {isAnswered && (
           <div
             style={{
-              background: selectedIndex === question.correctAnswer ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-              border: `1px solid ${selectedIndex === question.correctAnswer ? '#22c55e' : '#ef4444'}`,
+              background:
+                selectedIndex === question.correctAnswer && !isTimeout
+                  ? 'rgba(34, 197, 94, 0.12)'
+                  : 'rgba(239, 68, 68, 0.12)',
+              border: `1px solid ${
+                selectedIndex === question.correctAnswer && !isTimeout ? '#22c55e' : '#ef4444'
+              }`,
               borderRadius: '10px',
-              padding: '12px',
+              padding: '14px',
               marginBottom: '16px',
               fontSize: '0.85rem',
             }}
           >
-            <strong style={{ color: selectedIndex === question.correctAnswer ? '#4ade80' : '#f87171' }}>
-              {selectedIndex === question.correctAnswer ? '✨ คำตอบถูกต้อง! (สาธุ)' : '❌ ตอบผิด!'}
-            </strong>
-            <p style={{ margin: '4px 0 0 0', color: 'var(--text-muted)' }}>
-              {question.explanation}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+              <strong
+                style={{
+                  fontSize: '0.95rem',
+                  color: selectedIndex === question.correctAnswer && !isTimeout ? '#4ade80' : '#f87171',
+                }}
+              >
+                {isTimeout
+                  ? '⏰ หมดเวลา! ไม่สามารถตอบคำถามได้ทัน'
+                  : selectedIndex === question.correctAnswer
+                  ? '✨ คำตอบถูกต้อง! (สาธุ)'
+                  : '❌ ตอบผิด!'}
+              </strong>
+
+              {selectedIndex === question.correctAnswer && !isTimeout && (
+                <span
+                  style={{
+                    background: 'rgba(212,175,55,0.2)',
+                    color: speedGrade.color,
+                    padding: '2px 8px',
+                    borderRadius: '12px',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  {speedGrade.icon} {speedGrade.label}
+                </span>
+              )}
+            </div>
+
+            {selectedIndex === question.correctAnswer && !isTimeout && (
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '12px',
+                  margin: '8px 0',
+                  padding: '6px 10px',
+                  background: 'rgba(0,0,0,0.25)',
+                  borderRadius: '6px',
+                  fontSize: '0.8rem',
+                }}
+              >
+                <div>
+                  ⏱️ เวลาที่ใช้: <strong>{timeTaken.toFixed(1)} วิ</strong>
+                </div>
+                <div>
+                  ⚡ โบนัสความเร็ว: <strong style={{ color: '#fbbf24' }}>+{earnedBonus} แต้มปัญญา</strong>
+                </div>
+              </div>
+            )}
+
+            <p style={{ margin: '6px 0 0 0', color: 'var(--text-muted)' }}>
+              <strong>คำอธิบาย:</strong> {question.explanation}
             </p>
           </div>
         )}
 
+        {/* Footer / Buttons */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           {canUseFreeCard && !isAnswered && onUseFreeCard && (
             <button
-              onClick={onUseFreeCard}
+              onClick={handleUseFreeCardLocal}
               className="secondary-button"
               style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem' }}
             >
@@ -192,3 +434,4 @@ export const QuizModal: React.FC<Props> = ({
     </div>
   );
 };
+
