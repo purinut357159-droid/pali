@@ -196,7 +196,7 @@ export const App: React.FC = () => {
     }
 
     if (currentPlayer.isSkipTurn) {
-      addLog(`${currentPlayer.name} ติดภารกิจทบทวนตำรา ข้ามการเล่น 1 ตา`, 'warning');
+      addLog(`${currentPlayer.name} ติดภารกิจทำข้อสอบในสนามสอบสนามหลวง ข้ามการเล่น 1 ตา`, 'warning');
       setGameState((prev) => {
         const updatedPlayers = [...prev.players];
         updatedPlayers[prev.currentTurnPlayerIndex].isSkipTurn = false;
@@ -213,7 +213,7 @@ export const App: React.FC = () => {
     setRolledDoubles(isDoubles && currentDoubles < 3);
 
     if (currentDoubles >= 3) {
-      addLog(`⚠️ ${currentPlayer.name} ทอยลูกเต๋าออกคู่ 3 ครั้งติดต่อกัน! ถูกส่งเข้าเรือนพักผ่อน`, 'danger');
+      addLog(`⚠️ ${currentPlayer.name} ทอยลูกเต๋าออกคู่ 3 ครั้งติดต่อกัน! ถูกส่งเข้าสนามสอบสนามหลวง`, 'danger');
       setGameState((prev) => {
         const updatedPlayers = [...prev.players];
         const p = updatedPlayers[prev.currentTurnPlayerIndex];
@@ -316,7 +316,7 @@ export const App: React.FC = () => {
     } else if (tile.type === 'exam') {
       triggerQuestion(tile, 'exam', 'สนามสอบเปรียญ! ตอบถูกรับโบนัสใหญ่ +300 แต้ม');
     } else if (tile.type === 'goto_jail') {
-      addLog(`🚨 ${currentPlayer.name} ตกช่อง "${tile.name}"! ถูกส่งตัวไปยังช่อง 10 (เรือนพักผ่อน) และติดภารกิจหยุดพัก 1 ตา!`, 'danger');
+      addLog(`🚨 ${currentPlayer.name} ตกช่อง "${tile.name}"! ถูกส่งตัวไปยังช่อง 10 (สนามสอบสนามหลวง) และติดภารกิจทำข้อสอบหยุดพัก 1 ตา!`, 'danger');
       setGameState((prev) => {
         const updatedPlayers = [...prev.players];
         const p = updatedPlayers[prev.currentTurnPlayerIndex];
@@ -328,7 +328,7 @@ export const App: React.FC = () => {
       setTimeout(nextTurn, 1200);
       return;
     } else if (tile.type === 'rest') {
-      addLog(`🧘‍♂️ ${currentPlayer.name} เดินมาแวะพัก ณ ${tile.name} (แวะเยี่ยมเฉยๆ ไม่เสียตาเล่น)`, 'info');
+      addLog(`🏛️ ${currentPlayer.name} เดินมาแวะชม ณ ${tile.name} (แวะเยี่ยมเฉยๆ ไม่เสียตาเล่น)`, 'info');
       finishTurnCheck();
     } else {
       addLog(`${currentPlayer.name} พักผ่อน ณ ${tile.name}`, 'info');
