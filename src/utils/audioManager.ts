@@ -181,6 +181,34 @@ class AudioManager {
     osc.start(now);
     osc.stop(now + 0.4);
   }
+
+  // เสียงส่งเข้าคุก / สนามสอบสนามหลวง (Jail / Siren Alert Sound)
+  public playJailSound() {
+    if (this.isMuted) return;
+    this.init();
+    if (!this.ctx) return;
+
+    const freqs = [350, 220, 180, 120];
+    freqs.forEach((freq, idx) => {
+      if (!this.ctx) return;
+      const now = this.ctx.currentTime + idx * 0.12;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(freq, now);
+      osc.frequency.exponentialRampToValueAtTime(freq * 0.7, now + 0.2);
+
+      gain.gain.setValueAtTime(0.3, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.25);
+    });
+  }
 }
 
 export const audioManager = new AudioManager();

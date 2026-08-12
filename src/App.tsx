@@ -202,41 +202,58 @@ export const App: React.FC = () => {
     }
 
     if (currentPlayer.isSkipTurn) {
-      addLog(`${currentPlayer.name} ติดภารกิจทำข้อสอบในสนามสอบสนามหลวง ข้ามการเล่น 1 ตา`, 'warning');
+      addLog(`🏛️ ${currentPlayer.name} ติดภารกิจทำข้อสอบในสนามสอบสนามหลวง (คุก) ข้ามการเล่น 1 ตา`, 'warning');
       setGameState((prev) => {
         const updatedPlayers = [...prev.players];
         updatedPlayers[prev.currentTurnPlayerIndex].isSkipTurn = false;
-        return { ...prev, players: updatedPlayers };
-      });
-      nextTurn();
-      return;
-    }
-
-    setGameState((prev) => ({ ...prev, dice: [d1, d2], isDiceRolled: true }));
-    addLog(`${currentPlayer.name} ทอยลูกเต๋าได้ ${d1} + ${d2} = ${totalStep} แต้ม ${isDoubles ? '🎲 (ลูกเต๋าออกคู่!)' : ''}`, 'info');
-
-    let currentDoubles = isDoubles ? currentPlayer.doublesStreak + 1 : 0;
-    setRolledDoubles(isDoubles && currentDoubles < 3);
-
-    if (currentDoubles >= 3) {
-      addLog(`⚠️ ${currentPlayer.name} ทอยลูกเต๋าออกคู่ 3 ครั้งติดต่อกัน! ถูกส่งเข้าสนามสอบสนามหลวง`, 'danger');
-      setGameState((prev) => {
-        const updatedPlayers = [...prev.players];
-        const p = updatedPlayers[prev.currentTurnPlayerIndex];
-        p.position = 10;
-        p.isSkipTurn = true;
-        p.doublesStreak = 0;
+        updatedPlayers[prev.currentTurnPlayerIndex].doublesStreak = 0;
         return { ...prev, players: updatedPlayers };
       });
       setTimeout(nextTurn, 1000);
       return;
     }
 
+    const currentDoubles = isDoubles ? currentPlayer.doublesStreak + 1 : 0;
+
+    if (currentDoubles >= 3) {
+      audioManager.playJailSound();
+      addLog(`🚨 ${currentPlayer.name} ทอยลูกเต๋าออกคู่ 3 ครั้งติดต่อกัน (${d1}-${d2})! ถูกส่งเข้าสนามสอบสนามหลวง (คุก) ทันที และหยุดพัก 1 ตา!`, 'danger');
+      setRolledDoubles(false);
+      setGameState((prev) => {
+        const updatedPlayers = [...prev.players];
+        const p = updatedPlayers[prev.currentTurnPlayerIndex];
+        p.position = 10;
+        p.isSkipTurn = true;
+        p.doublesStreak = 0;
+        return {
+          ...prev,
+          dice: [d1, d2],
+          isDiceRolled: true,
+          players: updatedPlayers,
+        };
+      });
+      setTimeout(nextTurn, 1500);
+      return;
+    }
+
+    setRolledDoubles(isDoubles && currentDoubles < 3);
+
     setGameState((prev) => {
       const updatedPlayers = [...prev.players];
       updatedPlayers[prev.currentTurnPlayerIndex].doublesStreak = currentDoubles;
-      return { ...prev, players: updatedPlayers };
+      return {
+        ...prev,
+        dice: [d1, d2],
+        isDiceRolled: true,
+        players: updatedPlayers,
+      };
     });
+
+    if (isDoubles) {
+      addLog(`🎲 ${currentPlayer.name} ทอยลูกเต๋าได้ ${d1} + ${d2} = ${totalStep} แต้ม ✨ ลูกเต๋าออกคู่ (${d1}-${d2}) ครั้งที่ ${currentDoubles}/3! ได้สิทธิ์เล่นต่อหลังจากจบรอบนี้`, 'info');
+    } else {
+      addLog(`${currentPlayer.name} ทอยลูกเต๋าได้ ${d1} + ${d2} = ${totalStep} แต้ม`, 'info');
+    }
 
     const oldPos = currentPlayer.position;
     const newPos = (oldPos + totalStep) % 40;
@@ -322,7 +339,9 @@ export const App: React.FC = () => {
     } else if (tile.type === 'exam') {
       triggerQuestion(tile, 'exam', 'สนามสอบเปรียญ! ตอบถูกรับโบนัสใหญ่ +300 แต้ม');
     } else if (tile.type === 'goto_jail') {
+      audioManager.playJailSound();
       addLog(`🚨 ${currentPlayer.name} ตกช่อง "${tile.name}"! ถูกส่งตัวไปยังช่อง 10 (สนามสอบสนามหลวง) และติดภารกิจทำข้อสอบหยุดพัก 1 ตา!`, 'danger');
+      setRolledDoubles(false);
       setGameState((prev) => {
         const updatedPlayers = [...prev.players];
         const p = updatedPlayers[prev.currentTurnPlayerIndex];
@@ -331,7 +350,7 @@ export const App: React.FC = () => {
         p.doublesStreak = 0;
         return { ...prev, players: updatedPlayers };
       });
-      setTimeout(nextTurn, 1200);
+      setTimeout(nextTurn, 1500);
       return;
     } else if (tile.type === 'rest') {
       addLog(`🏛️ ${currentPlayer.name} เดินมาแวะชม ณ ${tile.name} (แวะเยี่ยมเฉยๆ ไม่เสียตาเล่น)`, 'info');
@@ -549,8 +568,11 @@ export const App: React.FC = () => {
 
   const finishTurnCheck = () => {
     const currentPlayer = gameState.players[gameState.currentTurnPlayerIndex];
+    if (!currentPlayer) return;
+
     if (rolledDoubles && !currentPlayer.isBankrupt && !currentPlayer.isSkipTurn) {
-      addLog(`🎲 ${currentPlayer.name} ได้สิทธิ์ทอยลูกเต๋าอีกครั้ง (ลูกเต๋าออกคู่)`, 'info');
+      addLog(`🎲✨ ${currentPlayer.name} ได้สิทธิ์ทอยลูกเต๋าต่อทันที! (โบนัสลูกเต๋าออกคู่ ครั้งที่ ${currentPlayer.doublesStreak}/3)`, 'success');
+      audioManager.playSathuChime();
       setGameState((prev) => ({ ...prev, isDiceRolled: false }));
     } else {
       setTimeout(nextTurn, currentPlayer.isAi ? 1000 : 800);
@@ -573,9 +595,14 @@ export const App: React.FC = () => {
         };
       }
 
-      let nextIndex = (prev.currentTurnPlayerIndex + 1) % prev.players.length;
-      while (prev.players[nextIndex]?.isBankrupt) {
-        nextIndex = (nextIndex + 1) % prev.players.length;
+      // Reset the current player's doubles streak when passing turn
+      const updatedPlayers = prev.players.map((p, idx) =>
+        idx === prev.currentTurnPlayerIndex ? { ...p, doublesStreak: 0 } : p
+      );
+
+      let nextIndex = (prev.currentTurnPlayerIndex + 1) % updatedPlayers.length;
+      while (updatedPlayers[nextIndex]?.isBankrupt) {
+        nextIndex = (nextIndex + 1) % updatedPlayers.length;
       }
 
       let nextRound = prev.currentRound;
@@ -594,6 +621,7 @@ export const App: React.FC = () => {
 
       return {
         ...prev,
+        players: updatedPlayers,
         currentTurnPlayerIndex: nextIndex,
         currentRound: nextRound,
         isDiceRolled: false,
@@ -633,7 +661,7 @@ export const App: React.FC = () => {
     if (activeEventCard && activeEventCard.player.isAi) {
       const timer = setTimeout(() => {
         setActiveEventCard(null);
-        nextTurn();
+        finishTurnCheck();
       }, 1500);
       return () => clearTimeout(timer);
     }
@@ -663,7 +691,7 @@ export const App: React.FC = () => {
           });
         }
         setActiveTileDetail(null);
-        nextTurn();
+        finishTurnCheck();
       }, 1200);
       return () => clearTimeout(timer);
     }

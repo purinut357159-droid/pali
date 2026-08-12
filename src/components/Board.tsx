@@ -183,6 +183,7 @@ export const Board: React.FC<Props> = ({
             isDiceRolled={isDiceRolled}
             onRollDice={onRollDice}
             disabled={currentTurnPlayer.isAi || !!movingPlayerId}
+            doublesStreak={currentTurnPlayer.doublesStreak}
           />
         </div>
 

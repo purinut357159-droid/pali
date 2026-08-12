@@ -7,9 +7,10 @@ interface Props {
   isDiceRolled: boolean;
   onRollDice: () => void;
   disabled?: boolean;
+  doublesStreak?: number;
 }
 
-export const DiceRoller: React.FC<Props> = ({ dice, isDiceRolled, onRollDice, disabled }) => {
+export const DiceRoller: React.FC<Props> = ({ dice, isDiceRolled, onRollDice, disabled, doublesStreak = 0 }) => {
   const [isRolling, setIsRolling] = useState<boolean>(false);
   const [tempDice, setTempDice] = useState<[number, number]>([1, 1]);
   const [showDoublesEffect, setShowDoublesEffect] = useState<boolean>(false);
@@ -42,6 +43,8 @@ export const DiceRoller: React.FC<Props> = ({ dice, isDiceRolled, onRollDice, di
       if (dice[0] === dice[1]) {
         setShowDoublesEffect(true);
         audioManager.playSathuChime();
+      } else {
+        setShowDoublesEffect(false);
       }
     }
   }, [isDiceRolled, dice, isRolling]);
@@ -123,19 +126,21 @@ export const DiceRoller: React.FC<Props> = ({ dice, isDiceRolled, onRollDice, di
           style={{
             fontSize: '0.78rem',
             fontWeight: 700,
-            color: '#f59e0b',
-            background: 'rgba(245, 158, 11, 0.15)',
-            border: '1px solid #f59e0b',
-            padding: '3px 12px',
+            color: doublesStreak >= 2 ? '#ef4444' : '#f59e0b',
+            background: doublesStreak >= 2 ? 'rgba(239, 68, 68, 0.2)' : 'rgba(245, 158, 11, 0.15)',
+            border: `1px solid ${doublesStreak >= 2 ? '#ef4444' : '#f59e0b'}`,
+            padding: '4px 14px',
             borderRadius: '12px',
             display: 'flex',
             alignItems: 'center',
-            gap: '4px',
+            gap: '6px',
             animation: 'pulse 1s infinite',
           }}
         >
-          <Sparkles size={14} color="#f59e0b" />
-          🎲 ออกคู่ {dice[0]}-{dice[1]}! ได้สิทธิ์ทอยเพิ่มอีก 1 ตา!
+          <Sparkles size={14} color={doublesStreak >= 2 ? '#ef4444' : '#f59e0b'} />
+          {doublesStreak === 1 && `🎲 ออกคู่ ${dice[0]}-${dice[1]}! ได้สิทธิ์ทอยเพิ่มอีก 1 ครั้ง (ครั้งที่ 1/3)`}
+          {doublesStreak === 2 && `🔥 ออกคู่ซ้อน 2 ครั้งติด (${dice[0]}-${dice[1]})! ได้สิทธิ์ทอยต่อ (⚠️ ออกคู่ครั้งที่ 3 เข้าคุกทันที!)`}
+          {doublesStreak >= 3 && `🚨 ออกคู่ 3 ครั้งติดต่อกัน (${dice[0]}-${dice[1]})! ส่งเข้าสนามสอบสนามหลวง (คุก)`}
         </div>
       )}
 
@@ -150,11 +155,19 @@ export const DiceRoller: React.FC<Props> = ({ dice, isDiceRolled, onRollDice, di
           letterSpacing: '0.5px',
           background: isRolling
             ? 'linear-gradient(135deg, #e67e22, #d35400)'
+            : doublesStreak > 0
+            ? 'linear-gradient(135deg, #e11d48 0%, #f59e0b 100%)'
             : 'linear-gradient(135deg, #f39c12 0%, #d4af37 100%)',
         }}
       >
         <Dices size={22} className={isRolling ? 'rolling-dice-1' : ''} />
-        {isRolling ? 'กำลังหมุนลูกเต๋า...' : isDiceRolled ? 'กำลังดำเนินการ' : '🎲 ทอยลูกเต๋า'}
+        {isRolling
+          ? 'กำลังหมุนลูกเต๋า...'
+          : isDiceRolled
+          ? 'กำลังดำเนินการ...'
+          : doublesStreak > 0
+          ? `🎲 ทอยต่อ (ได้สิทธิ์จากออกคู่ ครั้งที่ ${doublesStreak})`
+          : '🎲 ทอยลูกเต๋า'}
       </button>
     </div>
   );
