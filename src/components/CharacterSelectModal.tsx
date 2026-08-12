@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CHARACTERS } from '../data/charactersData';
 import type { Character, GameMode } from '../types/game';
-import { Play, Users, Bot } from 'lucide-react';
+import type { UserAccount } from '../types/auth';
+import { Play, Users, Bot, LogIn, Sparkles } from 'lucide-react';
 
 export interface PlayerSetupConfig {
   name: string;
@@ -11,18 +12,28 @@ export interface PlayerSetupConfig {
 
 interface Props {
   onStartGame: (playersConfig: PlayerSetupConfig[], mode: GameMode, rounds: number) => void;
+  currentUser?: UserAccount | null;
+  onOpenAuthModal?: () => void;
 }
 
-export const CharacterSelectModal: React.FC<Props> = ({ onStartGame }) => {
+export const CharacterSelectModal: React.FC<Props> = ({
+  onStartGame,
+  currentUser,
+  onOpenAuthModal,
+}) => {
   const [playType, setPlayType] = useState<'ai' | 'pass_play'>('pass_play');
 
-  const [singlePlayerName, setSinglePlayerName] = useState<string>('ท่าน (ผู้เล่น 1)');
-  const [singleCharId, setSingleCharId] = useState<string>('monk');
+  const [singlePlayerName, setSinglePlayerName] = useState<string>(
+    currentUser ? currentUser.displayName : 'ท่าน (ผู้เล่น 1)'
+  );
+  const [singleCharId, setSingleCharId] = useState<string>(
+    currentUser?.favoriteCharacter || 'monk'
+  );
   const [aiCount, setAiCount] = useState<number>(2);
 
   const [humanPlayerCount, setHumanPlayerCount] = useState<number>(2);
   const [multiplayerConfig, setMultiplayerConfig] = useState<{ name: string; charId: string }[]>([
-    { name: 'ผู้เล่น 1', charId: 'monk' },
+    { name: currentUser ? currentUser.displayName : 'ผู้เล่น 1', charId: currentUser?.favoriteCharacter || 'monk' },
     { name: 'ผู้เล่น 2', charId: 'novice' },
     { name: 'ผู้เล่น 3', charId: 'teacher' },
     { name: 'ผู้เล่น 4', charId: 'student' },
@@ -30,6 +41,19 @@ export const CharacterSelectModal: React.FC<Props> = ({ onStartGame }) => {
 
   const [gameMode] = useState<GameMode>('points');
   const [rounds] = useState<number>(20);
+
+  // Sync state if currentUser changes
+  useEffect(() => {
+    if (currentUser) {
+      setSinglePlayerName(currentUser.displayName);
+      setSingleCharId(currentUser.favoriteCharacter);
+      setMultiplayerConfig((prev) => {
+        const updated = [...prev];
+        updated[0] = { name: currentUser.displayName, charId: currentUser.favoriteCharacter };
+        return updated;
+      });
+    }
+  }, [currentUser]);
 
   const handleMultiNameChange = (index: number, name: string) => {
     const updated = [...multiplayerConfig];
@@ -49,7 +73,7 @@ export const CharacterSelectModal: React.FC<Props> = ({ onStartGame }) => {
     if (playType === 'ai') {
       const char = CHARACTERS.find((c) => c.id === singleCharId) || CHARACTERS[0];
       setupConfigs.push({
-        name: singlePlayerName || 'ผู้เล่น 1',
+        name: singlePlayerName || (currentUser ? currentUser.displayName : 'ผู้เล่น 1'),
         character: char,
         isAi: false,
       });
@@ -92,7 +116,7 @@ export const CharacterSelectModal: React.FC<Props> = ({ onStartGame }) => {
           boxShadow: '0 0 40px rgba(212,175,55,0.3)',
         }}
       >
-        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '16px' }}>
           <span style={{ fontSize: '2.5rem' }}>🎲</span>
           <h1 className="gold-gradient-text" style={{ fontSize: '1.8rem', margin: '4px 0' }}>
             บาลีส่วนฐี (Pali Tycoon)
@@ -101,6 +125,80 @@ export const CharacterSelectModal: React.FC<Props> = ({ onStartGame }) => {
             ตั้งค่าผู้เล่นและเลือกโหมดเพื่อเริ่มการแข่งขันกระดานบาลี
           </p>
         </div>
+
+        {/* User Account Status Banner */}
+        {currentUser ? (
+          <div
+            style={{
+              background: 'linear-gradient(135deg, rgba(212, 175, 55, 0.15), rgba(16, 25, 50, 0.6))',
+              border: '1px solid var(--primary-gold)',
+              borderRadius: '12px',
+              padding: '10px 16px',
+              marginBottom: '18px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <span style={{ fontSize: '1.6rem' }}>{currentUser.avatar}</span>
+              <div>
+                <div style={{ fontWeight: 700, color: '#fff', fontSize: '0.9rem' }}>
+                  เข้าสู่ระบบในชื่อ: <span style={{ color: 'var(--primary-gold)' }}>{currentUser.displayName}</span>
+                </div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--accent-gold)' }}>
+                  Lv.{currentUser.level} • {currentUser.rankTitle} (ผลการเล่นจะถูกบันทึกเข้าบัญชีนี้)
+                </div>
+              </div>
+            </div>
+
+            {onOpenAuthModal && (
+              <button
+                onClick={onOpenAuthModal}
+                style={{
+                  background: 'rgba(255,255,255,0.1)',
+                  border: '1px solid rgba(255,255,255,0.2)',
+                  color: '#fff',
+                  borderRadius: '6px',
+                  padding: '4px 10px',
+                  fontSize: '0.75rem',
+                  cursor: 'pointer',
+                }}
+              >
+                สลับบัญชี
+              </button>
+            )}
+          </div>
+        ) : (
+          <div
+            style={{
+              background: 'rgba(255, 255, 255, 0.04)',
+              border: '1px dashed rgba(212, 175, 55, 0.4)',
+              borderRadius: '12px',
+              padding: '10px 16px',
+              marginBottom: '18px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+              <Sparkles size={16} color="var(--primary-gold)" />
+              <span>ต้องการบันทึกเลเวล สถิติ และคำศัพท์ไว้ตลอดไปไหม?</span>
+            </div>
+
+            {onOpenAuthModal && (
+              <button
+                onClick={onOpenAuthModal}
+                className="gold-button"
+                style={{ padding: '6px 12px', fontSize: '0.75rem', gap: '4px' }}
+              >
+                <LogIn size={14} />
+                เข้าสู่ระบบ / สมัคร
+              </button>
+            )}
+          </div>
+        )}
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '20px' }}>
           <button
@@ -179,6 +277,11 @@ export const CharacterSelectModal: React.FC<Props> = ({ onStartGame }) => {
                 >
                   <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
                     ชื่อผู้เล่นคนที่ {idx + 1}:
+                    {idx === 0 && currentUser && (
+                      <span style={{ color: 'var(--primary-gold)', marginLeft: '6px' }}>
+                        (บัญชีของคุณ: {currentUser.displayName})
+                      </span>
+                    )}
                   </label>
                   <input
                     type="text"
@@ -231,6 +334,11 @@ export const CharacterSelectModal: React.FC<Props> = ({ onStartGame }) => {
             <div style={{ marginBottom: '16px' }}>
               <label style={{ fontSize: '0.85rem', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
                 ชื่อของคุณ:
+                {currentUser && (
+                  <span style={{ color: 'var(--primary-gold)', marginLeft: '6px' }}>
+                    (บัญชีของคุณ: {currentUser.displayName})
+                  </span>
+                )}
               </label>
               <input
                 type="text"

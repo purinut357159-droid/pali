@@ -1,21 +1,28 @@
 import React from 'react';
-import { Volume2, VolumeX, BookOpen, RefreshCw } from 'lucide-react';
+import { Volume2, VolumeX, BookOpen, RefreshCw, LogIn } from 'lucide-react';
 import type { GameState } from '../types/game';
+import type { UserAccount } from '../types/auth';
 
 interface Props {
   gameState: GameState;
+  currentUser: UserAccount | null;
   onOpenNotebook: () => void;
   onRestart: () => void;
   onToggleMute: () => void;
   isMuted: boolean;
+  onOpenAuthModal: () => void;
+  onOpenProfileModal: () => void;
 }
 
 export const GameHeader: React.FC<Props> = ({
   gameState,
+  currentUser,
   onOpenNotebook,
   onRestart,
   onToggleMute,
   isMuted,
+  onOpenAuthModal,
+  onOpenProfileModal,
 }) => {
   const currentTurnPlayer = gameState.players[gameState.currentTurnPlayerIndex];
   const dueReviewsCount = gameState.reviewItems.filter((i) => !i.mastered).length;
@@ -52,7 +59,51 @@ export const GameHeader: React.FC<Props> = ({
           </div>
         )}
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+          {/* User Profile / Auth Button */}
+          {currentUser ? (
+            <button
+              onClick={onOpenProfileModal}
+              className="glass-panel"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '6px 12px',
+                borderRadius: '12px',
+                border: '1px solid var(--primary-gold)',
+                background: 'rgba(212, 175, 55, 0.15)',
+                color: '#fff',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+              }}
+              title="เปิดหน้าโปรไฟล์และสถิติ"
+            >
+              <span style={{ fontSize: '1.2rem' }}>{currentUser.avatar}</span>
+              <div style={{ textAlign: 'left', lineHeight: 1.2 }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--primary-gold)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span>{currentUser.displayName}</span>
+                  <span style={{ fontSize: '0.65rem', background: 'var(--primary-gold)', color: '#090e1a', padding: '1px 5px', borderRadius: '8px', fontWeight: 800 }}>
+                    Lv.{currentUser.level}
+                  </span>
+                </div>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                  {currentUser.rankTitle}
+                </div>
+              </div>
+            </button>
+          ) : (
+            <button
+              onClick={onOpenAuthModal}
+              className="gold-button"
+              style={{ padding: '8px 14px', fontSize: '0.85rem', gap: '6px' }}
+              title="เข้าสู่ระบบ หรือ สมัครสมาชิกเพื่อบันทึกสถิติ"
+            >
+              <LogIn size={16} />
+              <span>เข้าสู่ระบบ / สมาชิก</span>
+            </button>
+          )}
+
           <button
             onClick={onOpenNotebook}
             className="secondary-button"

@@ -1,0 +1,365 @@
+import type { UserAccount, AuthSession, Achievement } from '../types/auth';
+import { ACHIEVEMENTS_LIST, getRankTitle } from '../types/auth';
+import type { ReviewItem, CharacterId } from '../types/game';
+
+const STORAGE_KEY_ACCOUNTS = 'pali_accounts_v1';
+const STORAGE_KEY_SESSION = 'pali_session_v1';
+
+function hashPassword(password: string): string {
+  try {
+    return btoa(encodeURIComponent(password));
+  } catch {
+    return password;
+  }
+}
+
+const INITIAL_DEMO_ACCOUNTS: UserAccount[] = [
+  {
+    id: 'user_demo_1',
+    username: 'pali_scholar',
+    passwordHash: hashPassword('123456'),
+    displayName: 'มหาปุรินทร์ (ภิกษุผู้เพียรศึกษา)',
+    avatar: '🧘‍♂️',
+    favoriteCharacter: 'monk',
+    createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+    lastLogin: new Date().toISOString(),
+    level: 5,
+    exp: 420,
+    rankTitle: 'มหาเปรียญตรี (ป.ธ.๓)',
+    stats: {
+      gamesPlayed: 8,
+      gamesWon: 5,
+      correctAnswers: 34,
+      totalAnswers: 40,
+      propertiesBought: 28,
+      examsPassed: 4,
+      totalWisdomEarned: 16500,
+    },
+    reviewItems: [],
+    achievements: ['first_win', 'scholar_10', 'exam_master'],
+  },
+];
+
+export function getStoredAccounts(): UserAccount[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_ACCOUNTS);
+    if (!raw) {
+      localStorage.setItem(STORAGE_KEY_ACCOUNTS, JSON.stringify(INITIAL_DEMO_ACCOUNTS));
+      return INITIAL_DEMO_ACCOUNTS;
+    }
+    const accounts: UserAccount[] = JSON.parse(raw);
+    return accounts;
+  } catch (e) {
+    console.error('Failed to load accounts from storage', e);
+    return INITIAL_DEMO_ACCOUNTS;
+  }
+}
+
+export function saveStoredAccounts(accounts: UserAccount[]): void {
+  try {
+    localStorage.setItem(STORAGE_KEY_ACCOUNTS, JSON.stringify(accounts));
+  } catch (e) {
+    console.error('Failed to save accounts to storage', e);
+  }
+}
+
+export function getCurrentSession(): AuthSession | null {
+  try {
+    // Check localStorage first (remember me)
+    const localRaw = localStorage.getItem(STORAGE_KEY_SESSION);
+    if (localRaw) {
+      return JSON.parse(localRaw);
+    }
+    // Check sessionStorage (temporary)
+    const sessionRaw = sessionStorage.getItem(STORAGE_KEY_SESSION);
+    if (sessionRaw) {
+      return JSON.parse(sessionRaw);
+    }
+    return null;
+  } catch (e) {
+    console.error('Failed to get auth session', e);
+    return null;
+  }
+}
+
+export function setStoredSession(session: AuthSession | null, rememberMe: boolean = true): void {
+  try {
+    if (!session) {
+      localStorage.removeItem(STORAGE_KEY_SESSION);
+      sessionStorage.removeItem(STORAGE_KEY_SESSION);
+      return;
+    }
+
+    if (rememberMe) {
+      localStorage.setItem(STORAGE_KEY_SESSION, JSON.stringify(session));
+      sessionStorage.removeItem(STORAGE_KEY_SESSION);
+    } else {
+      sessionStorage.setItem(STORAGE_KEY_SESSION, JSON.stringify(session));
+      localStorage.removeItem(STORAGE_KEY_SESSION);
+    }
+  } catch (e) {
+    console.error('Failed to set auth session', e);
+  }
+}
+
+export function getCurrentUser(): UserAccount | null {
+  const session = getCurrentSession();
+  if (!session) return null;
+  const accounts = getStoredAccounts();
+  return accounts.find((acc) => acc.id === session.userId) || null;
+}
+
+export function registerAccount(
+  username: string,
+  password: string,
+  displayName: string,
+  avatar: string = '🧘‍♂️',
+  favoriteCharacter: CharacterId = 'monk'
+): { success: boolean; message: string; user?: UserAccount } {
+  const cleanUsername = username.trim().toLowerCase();
+  const cleanDisplayName = displayName.trim();
+
+  if (!cleanUsername || cleanUsername.length < 3) {
+    return { success: false, message: 'ชื่อผู้ใช้ (Username) ต้องมีความยาวอย่างน้อย 3 ตัวอักษร' };
+  }
+
+  if (!password || password.length < 4) {
+    return { success: false, message: 'รหัสผ่าน (Password) ต้องมีความยาวอย่างน้อย 4 ตัวอักษร' };
+  }
+
+  if (!cleanDisplayName) {
+    return { success: false, message: 'กรุณาระบุชื่อที่ต้องการแสดงในเกม (Display Name)' };
+  }
+
+  const accounts = getStoredAccounts();
+  const exists = accounts.some((acc) => acc.username.toLowerCase() === cleanUsername);
+
+  if (exists) {
+    return { success: false, message: 'ชื่อผู้ใช้นี้มีอยู่ในระบบแล้ว กรุณาเลือกชื่ออื่น' };
+  }
+
+  const newAccount: UserAccount = {
+    id: `user_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+    username: cleanUsername,
+    passwordHash: hashPassword(password),
+    displayName: cleanDisplayName,
+    avatar: avatar || '🧘‍♂️',
+    favoriteCharacter,
+    createdAt: new Date().toISOString(),
+    lastLogin: new Date().toISOString(),
+    level: 1,
+    exp: 0,
+    rankTitle: getRankTitle(1).title,
+    stats: {
+      gamesPlayed: 0,
+      gamesWon: 0,
+      correctAnswers: 0,
+      totalAnswers: 0,
+      propertiesBought: 0,
+      examsPassed: 0,
+      totalWisdomEarned: 0,
+    },
+    reviewItems: [],
+    achievements: [],
+  };
+
+  const updatedAccounts = [newAccount, ...accounts];
+  saveStoredAccounts(updatedAccounts);
+
+  const session: AuthSession = {
+    userId: newAccount.id,
+    username: newAccount.username,
+    displayName: newAccount.displayName,
+    avatar: newAccount.avatar,
+    favoriteCharacter: newAccount.favoriteCharacter,
+    level: newAccount.level,
+    rankTitle: newAccount.rankTitle,
+    rememberMe: true,
+  };
+  setStoredSession(session, true);
+
+  return { success: true, message: 'สมัครสมาชิกและเข้าสู่ระบบสำเร็จ!', user: newAccount };
+}
+
+export function loginAccount(
+  username: string,
+  password: string,
+  rememberMe: boolean = true
+): { success: boolean; message: string; user?: UserAccount } {
+  const cleanUsername = username.trim().toLowerCase();
+  const accounts = getStoredAccounts();
+
+  const user = accounts.find((acc) => acc.username.toLowerCase() === cleanUsername);
+  if (!user) {
+    return { success: false, message: 'ไม่พบบัญชีผู้ใช้นี้ในระบบ' };
+  }
+
+  if (user.passwordHash !== hashPassword(password)) {
+    return { success: false, message: 'รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง' };
+  }
+
+  user.lastLogin = new Date().toISOString();
+  saveStoredAccounts(accounts);
+
+  const session: AuthSession = {
+    userId: user.id,
+    username: user.username,
+    displayName: user.displayName,
+    avatar: user.avatar,
+    favoriteCharacter: user.favoriteCharacter,
+    level: user.level,
+    rankTitle: user.rankTitle,
+    rememberMe,
+  };
+  setStoredSession(session, rememberMe);
+
+  return { success: true, message: `ยินดีต้อนรับกลับ, ${user.displayName}!`, user };
+}
+
+export function switchAccount(userId: string): { success: boolean; user?: UserAccount } {
+  const accounts = getStoredAccounts();
+  const target = accounts.find((acc) => acc.id === userId);
+  if (!target) return { success: false };
+
+  target.lastLogin = new Date().toISOString();
+  saveStoredAccounts(accounts);
+
+  const session: AuthSession = {
+    userId: target.id,
+    username: target.username,
+    displayName: target.displayName,
+    avatar: target.avatar,
+    favoriteCharacter: target.favoriteCharacter,
+    level: target.level,
+    rankTitle: target.rankTitle,
+    rememberMe: true,
+  };
+  setStoredSession(session, true);
+
+  return { success: true, user: target };
+}
+
+export function logoutAccount(): void {
+  setStoredSession(null);
+}
+
+export function updateProfile(
+  userId: string,
+  updates: { displayName?: string; avatar?: string; favoriteCharacter?: CharacterId }
+): UserAccount | null {
+  const accounts = getStoredAccounts();
+  const userIndex = accounts.findIndex((acc) => acc.id === userId);
+  if (userIndex < 0) return null;
+
+  const user = accounts[userIndex];
+  if (updates.displayName?.trim()) user.displayName = updates.displayName.trim();
+  if (updates.avatar) user.avatar = updates.avatar;
+  if (updates.favoriteCharacter) user.favoriteCharacter = updates.favoriteCharacter;
+
+  accounts[userIndex] = user;
+  saveStoredAccounts(accounts);
+
+  const currentSession = getCurrentSession();
+  if (currentSession && currentSession.userId === userId) {
+    currentSession.displayName = user.displayName;
+    currentSession.avatar = user.avatar;
+    currentSession.favoriteCharacter = user.favoriteCharacter;
+    setStoredSession(currentSession, currentSession.rememberMe);
+  }
+
+  return user;
+}
+
+export function syncUserReviewDeck(userId: string, reviewItems: ReviewItem[]): void {
+  const accounts = getStoredAccounts();
+  const user = accounts.find((acc) => acc.id === userId);
+  if (!user) return;
+
+  user.reviewItems = reviewItems;
+  saveStoredAccounts(accounts);
+}
+
+export function recordMatchResult(
+  userId: string,
+  matchData: {
+    isWinner: boolean;
+    wisdomEarned: number;
+    correctAnswers: number;
+    totalAnswers: number;
+    propertiesBought: number;
+    examsPassed: number;
+  }
+): { user: UserAccount; newLevel: number; leveledUp: boolean; newAchievements: Achievement[] } | null {
+  const accounts = getStoredAccounts();
+  const userIndex = accounts.findIndex((acc) => acc.id === userId);
+  if (userIndex < 0) return null;
+
+  const user = accounts[userIndex];
+  const prevLevel = user.level;
+
+  // Update Stats
+  user.stats.gamesPlayed += 1;
+  if (matchData.isWinner) user.stats.gamesWon += 1;
+  user.stats.correctAnswers += matchData.correctAnswers;
+  user.stats.totalAnswers += matchData.totalAnswers;
+  user.stats.propertiesBought += matchData.propertiesBought;
+  user.stats.examsPassed += matchData.examsPassed;
+  user.stats.totalWisdomEarned += matchData.wisdomEarned;
+
+  // Calculate EXP:
+  // Base match exp: 50
+  // Win bonus: +100
+  // Per correct answer: +15
+  // Per exam passed: +30
+  const gainedExp =
+    50 +
+    (matchData.isWinner ? 100 : 0) +
+    matchData.correctAnswers * 15 +
+    matchData.examsPassed * 30;
+
+  user.exp += gainedExp;
+
+  // Level formula: level = Math.floor(exp / 150) + 1
+  const calculatedLevel = Math.floor(user.exp / 150) + 1;
+  user.level = calculatedLevel;
+  user.rankTitle = getRankTitle(user.level).title;
+
+  // Check achievements
+  const newlyUnlocked: Achievement[] = [];
+  if (!user.achievements) user.achievements = [];
+
+  const checkAchievement = (achId: string, condition: boolean) => {
+    if (condition && !user.achievements.includes(achId)) {
+      user.achievements.push(achId);
+      const found = ACHIEVEMENTS_LIST.find((a) => a.id === achId);
+      if (found) newlyUnlocked.push(found);
+    }
+  };
+
+  checkAchievement('first_win', user.stats.gamesWon >= 1);
+  checkAchievement('scholar_10', user.stats.correctAnswers >= 10);
+  checkAchievement('scholar_50', user.stats.correctAnswers >= 50);
+  checkAchievement('exam_master', user.stats.examsPassed >= 3);
+  checkAchievement('landlord', user.stats.propertiesBought >= 10);
+
+  const masteredVocabCount = user.reviewItems ? user.reviewItems.filter((i) => i.mastered).length : 0;
+  checkAchievement('vocab_master', masteredVocabCount >= 5);
+
+  accounts[userIndex] = user;
+  saveStoredAccounts(accounts);
+
+  // Sync session
+  const currentSession = getCurrentSession();
+  if (currentSession && currentSession.userId === userId) {
+    currentSession.level = user.level;
+    currentSession.rankTitle = user.rankTitle;
+    setStoredSession(currentSession, currentSession.rememberMe);
+  }
+
+  return {
+    user,
+    newLevel: user.level,
+    leveledUp: user.level > prevLevel,
+    newAchievements: newlyUnlocked,
+  };
+}

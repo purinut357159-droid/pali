@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { GameState, Player, BoardTile, Question, CardEffect, GameMode, SubjectCategory } from './types/game';
+import type { UserAccount } from './types/auth';
 import { BOARD_TILES } from './data/boardConfig';
 import { QUESTION_BANK } from './data/questionBank';
 import { BOON_CARDS, KARMA_CARDS } from './data/cardsData';
@@ -14,8 +15,15 @@ import { CharacterSelectModal } from './components/CharacterSelectModal';
 import type { PlayerSetupConfig } from './components/CharacterSelectModal';
 import { WinnerModal } from './components/WinnerModal';
 import { ChatWidget } from './components/ChatWidget';
+import { AuthModal } from './components/AuthModal';
+import { UserProfileModal } from './components/UserProfileModal';
 import { addWrongQuestionToSRS, markQuestionMastered } from './utils/srsEngine';
 import { audioManager } from './utils/audioManager';
+import {
+  getCurrentUser,
+  recordMatchResult,
+  syncUserReviewDeck,
+} from './utils/authService';
 
 function shuffleQuestionOptions(q: Question): Question {
   const originalCorrectText = q.options[q.correctAnswer];
@@ -36,6 +44,12 @@ function shuffleQuestionOptions(q: Question): Question {
 }
 
 export const App: React.FC = () => {
+  const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => getCurrentUser());
+  const [showAuthModal, setShowAuthModal] = useState<boolean>(false);
+  const [authModalTab, setAuthModalTab] = useState<'login' | 'register' | 'saved'>('login');
+  const [showProfileModal, setShowProfileModal] = useState<boolean>(false);
+  const [matchRecorded, setMatchRecorded] = useState<boolean>(false);
+
   const [gameState, setGameState] = useState<GameState>({
     mode: 'points',
     maxRounds: 20,
@@ -47,7 +61,7 @@ export const App: React.FC = () => {
     isDiceRolled: false,
     gameStatus: 'setup',
     logs: [],
-    reviewItems: [],
+    reviewItems: currentUser?.reviewItems || [],
     askedQuestionIds: [],
   });
 
@@ -65,6 +79,16 @@ export const App: React.FC = () => {
   const [rolledDoubles, setRolledDoubles] = useState<boolean>(false);
   const [movingPlayerId, setMovingPlayerId] = useState<string | null>(null);
 
+  // Sync initial review items if user logs in
+  useEffect(() => {
+    if (currentUser?.reviewItems && gameState.gameStatus === 'setup') {
+      setGameState((prev) => ({
+        ...prev,
+        reviewItems: currentUser.reviewItems,
+      }));
+    }
+  }, [currentUser, gameState.gameStatus]);
+
   const addLog = (text: string, type: 'info' | 'success' | 'warning' | 'danger' = 'info') => {
     const newLog = {
       id: Date.now().toString() + Math.random().toString(),
@@ -80,6 +104,7 @@ export const App: React.FC = () => {
 
   const handleStartGame = (configs: PlayerSetupConfig[], mode: GameMode, rounds: number) => {
     const playerColors = ['#f59e0b', '#3b82f6', '#ec4899', '#10b981'];
+    setMatchRecorded(false);
 
     const newPlayers: Player[] = configs.map((cfg, idx) => ({
       id: `p_${idx + 1}`,
@@ -112,12 +137,46 @@ export const App: React.FC = () => {
       isDiceRolled: false,
       gameStatus: 'playing',
       logs: [],
-      reviewItems: [],
+      reviewItems: currentUser?.reviewItems || gameState.reviewItems,
       askedQuestionIds: [],
     });
 
     addLog(`🎲 เริ่มเกมบาลีส่วนฐี (${configs.length} ผู้เล่น)! ผู้เล่นทุกคนเริ่มด้วย 2,000 แต้มปัญญาเท่ากัน`, 'success');
   };
+
+  // Check Game Over and Record Results to User Profile
+  useEffect(() => {
+    if (gameState.gameStatus === 'game_over' && gameState.winner && currentUser && !matchRecorded) {
+      setMatchRecorded(true);
+      const userPlayer = gameState.players.find((p) => !p.isAi) || gameState.players[0];
+
+      if (userPlayer) {
+        const isWinner = gameState.winner.id === userPlayer.id;
+        const recordRes = recordMatchResult(currentUser.id, {
+          isWinner,
+          wisdomEarned: userPlayer.wisdomPoints,
+          correctAnswers: userPlayer.stats.correctAnswers,
+          totalAnswers: userPlayer.stats.totalAnswers,
+          propertiesBought: userPlayer.stats.propertiesBought,
+          examsPassed: userPlayer.stats.examsPassed,
+        });
+
+        if (recordRes) {
+          setCurrentUser(recordRes.user);
+
+          if (recordRes.leveledUp) {
+            addLog(`🎉 ยินดีด้วย! ${recordRes.user.displayName} เลื่อนระดับสู่ Lv.${recordRes.newLevel} (${recordRes.user.rankTitle})!`, 'success');
+          }
+
+          if (recordRes.newAchievements.length > 0) {
+            recordRes.newAchievements.forEach((ach) => {
+              addLog(`🏆 ปลดล็อกเหรียญตรา: "${ach.title}" - ${ach.description}`, 'success');
+            });
+          }
+        }
+      }
+    }
+  }, [gameState.gameStatus, gameState.winner, gameState.players, currentUser, matchRecorded]);
 
   const hasColorGroupMonopoly = (tiles: BoardTile[], playerId: string, category?: SubjectCategory): boolean => {
     if (!category) return false;
@@ -354,11 +413,16 @@ export const App: React.FC = () => {
         } else if (mode === 'quiz' || mode === 'exam') {
           const reward = mode === 'exam' ? 300 : 150;
           p.wisdomPoints += reward;
+          if (mode === 'exam') p.stats.examsPassed += 1;
           addLog(`${p.name} ผ่านการสอบ รับโบนัสแต้มปัญญา +${reward} แต้ม!`, 'success');
         }
       } else {
         addLog(`${p.name} ตอบคำถามบาลีไม่ถูกต้อง`, 'danger');
         newReviewItems = addWrongQuestionToSRS(prev.reviewItems, question);
+
+        if (currentUser) {
+          syncUserReviewDeck(currentUser.id, newReviewItems);
+        }
 
         if (mode === 'rent' && targetTile) {
           const owner = prev.players.find((item) => item.id === targetTile.ownerId);
@@ -569,10 +633,16 @@ export const App: React.FC = () => {
     <div style={{ minHeight: '100vh', padding: '16px', maxWidth: '1400px', margin: '0 auto' }}>
       <GameHeader
         gameState={gameState}
+        currentUser={currentUser}
         onOpenNotebook={() => setShowReviewNotebook(true)}
         onRestart={() => setGameState((prev) => ({ ...prev, gameStatus: 'setup' }))}
         onToggleMute={() => setIsMuted(audioManager.toggleMute())}
         isMuted={isMuted}
+        onOpenAuthModal={() => {
+          setAuthModalTab('login');
+          setShowAuthModal(true);
+        }}
+        onOpenProfileModal={() => setShowProfileModal(true)}
       />
 
       {gameState.gameStatus === 'playing' && (
@@ -613,13 +683,26 @@ export const App: React.FC = () => {
               <div>คำถามในคลัง: {QUESTION_BANK.length} ข้อ</div>
               <div>คำถามทบทวนสะสม: {gameState.reviewItems.length} ข้อ</div>
               <div>คำถามที่ถามแล้ว: {gameState.askedQuestionIds.length} / {QUESTION_BANK.length} ข้อ</div>
+              {currentUser && (
+                <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(212,175,55,0.2)' }}>
+                  <div style={{ color: 'var(--primary-gold)', fontWeight: 600 }}>🌟 บัญชี: {currentUser.displayName}</div>
+                  <div style={{ color: 'var(--accent-gold)' }}>ยศ: {currentUser.rankTitle} (Lv.{currentUser.level})</div>
+                </div>
+              )}
             </div>
           </div>
         </div>
       )}
 
       {gameState.gameStatus === 'setup' && (
-        <CharacterSelectModal onStartGame={handleStartGame} />
+        <CharacterSelectModal
+          onStartGame={handleStartGame}
+          currentUser={currentUser}
+          onOpenAuthModal={() => {
+            setAuthModalTab('login');
+            setShowAuthModal(true);
+          }}
+        />
       )}
 
       {activeQuiz && currentPlayer && (
@@ -682,10 +765,14 @@ export const App: React.FC = () => {
           reviewItems={gameState.reviewItems}
           onClose={() => setShowReviewNotebook(false)}
           onMasterQuestion={(qId) => {
+            const updated = markQuestionMastered(gameState.reviewItems, qId);
             setGameState((prev) => ({
               ...prev,
-              reviewItems: markQuestionMastered(prev.reviewItems, qId),
+              reviewItems: updated,
             }));
+            if (currentUser) {
+              syncUserReviewDeck(currentUser.id, updated);
+            }
           }}
         />
       )}
@@ -695,6 +782,39 @@ export const App: React.FC = () => {
           winner={gameState.winner}
           players={gameState.players}
           onRestart={() => setGameState((prev) => ({ ...prev, gameStatus: 'setup' }))}
+        />
+      )}
+
+      {/* Authentication Modal */}
+      <AuthModal
+        isOpen={showAuthModal}
+        initialTab={authModalTab}
+        onClose={() => setShowAuthModal(false)}
+        onLoginSuccess={(user) => {
+          setCurrentUser(user);
+          addLog(`เข้าสู่ระบบในชื่อ ${user.displayName} เรียบร้อย!`, 'success');
+        }}
+      />
+
+      {/* User Profile Modal */}
+      {currentUser && (
+        <UserProfileModal
+          user={currentUser}
+          isOpen={showProfileModal}
+          onClose={() => setShowProfileModal(false)}
+          onUpdateUser={(updated) => {
+            setCurrentUser(updated);
+            addLog('อัปเดตข้อมูลโปรไฟล์เรียบร้อย', 'success');
+          }}
+          onLogout={() => {
+            setCurrentUser(null);
+            addLog('ออกจากระบบเรียบร้อย', 'info');
+          }}
+          onSwitchAccount={() => {
+            setShowProfileModal(false);
+            setAuthModalTab('saved');
+            setShowAuthModal(true);
+          }}
         />
       )}
 
