@@ -763,7 +763,7 @@ export const App: React.FC = () => {
   const currentPlayer = gameState.players[gameState.currentTurnPlayerIndex];
 
   return (
-    <div style={{ minHeight: '100vh', padding: '16px', maxWidth: '1400px', margin: '0 auto' }}>
+    <div className="game-app-container">
       <GameHeader
         gameState={gameState}
         currentUser={currentUser}
@@ -780,8 +780,8 @@ export const App: React.FC = () => {
       />
 
       {gameState.gameStatus === 'playing' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr 260px', gap: '16px', alignItems: 'start' }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        <div className="game-layout">
+          <div className="players-sidebar">
             <h3 style={{ fontSize: '0.9rem', color: 'var(--primary-gold)', margin: '0 0 4px 0' }}>
               👥 ผู้เข้าแข่งขัน (Players)
             </h3>
@@ -808,7 +808,7 @@ export const App: React.FC = () => {
             />
           </div>
 
-          <div className="glass-panel" style={{ padding: '16px' }}>
+          <div className="stats-sidebar glass-panel" style={{ padding: '16px' }}>
             <h3 style={{ fontSize: '0.9rem', color: 'var(--primary-gold)', margin: '0 0 10px 0' }}>
               📚 คลังวิชา & สถิติ
             </h3>

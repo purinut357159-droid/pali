@@ -30,7 +30,7 @@ export const GameHeader: React.FC<Props> = ({
   const dueReviewsCount = gameState.reviewItems.filter((i) => !i.mastered).length;
 
   return (
-    <header className="glass-panel" style={{ padding: '12px 20px', marginBottom: '16px' }}>
+    <header className="glass-panel game-header" style={{ padding: '12px 20px', marginBottom: '16px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
         
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -46,7 +46,7 @@ export const GameHeader: React.FC<Props> = ({
         </div>
 
         {gameState.gameStatus === 'playing' && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', background: 'rgba(255,255,255,0.05)', padding: '6px 16px', borderRadius: '12px', border: '1px solid rgba(212,175,55,0.2)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: 'rgba(255,255,255,0.05)', padding: '6px 14px', borderRadius: '12px', border: '1px solid rgba(212,175,55,0.2)' }}>
             <div>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>รอบที่: </span>
               <strong style={{ color: 'var(--accent-gold)' }}>{gameState.currentRound} / {gameState.maxRounds}</strong>
@@ -61,7 +61,7 @@ export const GameHeader: React.FC<Props> = ({
           </div>
         )}
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+        <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           {/* User Profile / Auth Button */}
           {currentUser ? (
             <button
@@ -73,8 +73,15 @@ export const GameHeader: React.FC<Props> = ({
                 gap: '8px',
                 padding: '6px 12px',
                 borderRadius: '12px',
-                border: '1px solid var(--primary-gold)',
-                background: 'rgba(212, 175, 55, 0.15)',
+                border: (currentUser.isDeveloper || currentUser.role === 'developer')
+                  ? '1.5px solid #38bdf8'
+                  : '1px solid var(--primary-gold)',
+                background: (currentUser.isDeveloper || currentUser.role === 'developer')
+                  ? 'linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(212, 175, 55, 0.15))'
+                  : 'rgba(212, 175, 55, 0.15)',
+                boxShadow: (currentUser.isDeveloper || currentUser.role === 'developer')
+                  ? '0 0 15px rgba(6, 182, 212, 0.3)'
+                  : 'none',
                 color: '#fff',
                 cursor: 'pointer',
                 transition: 'all 0.2s',
@@ -83,11 +90,17 @@ export const GameHeader: React.FC<Props> = ({
             >
               <span style={{ fontSize: '1.2rem' }}>{currentUser.avatar}</span>
               <div style={{ textAlign: 'left', lineHeight: 1.2 }}>
-                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--primary-gold)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: (currentUser.isDeveloper || currentUser.role === 'developer') ? '#38bdf8' : 'var(--primary-gold)', display: 'flex', alignItems: 'center', gap: '4px' }}>
                   <span>{currentUser.displayName}</span>
-                  <span style={{ fontSize: '0.65rem', background: 'var(--primary-gold)', color: '#090e1a', padding: '1px 5px', borderRadius: '8px', fontWeight: 800 }}>
-                    Lv.{currentUser.level}
-                  </span>
+                  {(currentUser.isDeveloper || currentUser.role === 'developer') ? (
+                    <span style={{ fontSize: '0.65rem', background: '#0284c7', color: '#fff', padding: '1px 5px', borderRadius: '8px', fontWeight: 800 }}>
+                      DEV Lv.{currentUser.level}
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: '0.65rem', background: 'var(--primary-gold)', color: '#090e1a', padding: '1px 5px', borderRadius: '8px', fontWeight: 800 }}>
+                      Lv.{currentUser.level}
+                    </span>
+                  )}
                 </div>
                 <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
                   {currentUser.rankTitle} {currentUser.stats?.currentWinStreak ? `🔥${currentUser.stats.currentWinStreak}` : ''}

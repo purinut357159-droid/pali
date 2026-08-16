@@ -12,10 +12,21 @@ import {
   BarChart2,
   TrendingUp,
   Flame,
+  Terminal,
+  Zap,
+  Cpu,
+  RotateCcw,
 } from 'lucide-react';
 import type { UserAccount } from '../types/auth';
 import { ACHIEVEMENTS_LIST, getRankTitle } from '../types/auth';
-import { updateProfile, logoutAccount } from '../utils/authService';
+import {
+  updateProfile,
+  logoutAccount,
+  devSetLevel,
+  devAddExp,
+  devUnlockAllAchievements,
+  devResetAccountStats,
+} from '../utils/authService';
 import { CHARACTERS } from '../data/charactersData';
 import type { CharacterId } from '../types/game';
 
@@ -29,7 +40,7 @@ interface Props {
   onOpenLeaderboard?: () => void;
 }
 
-const AVATAR_PRESETS = ['🧘‍♂️', '👨‍🏫', '👦', '🎓', '📿', '📜', '✨', '🏯', '👑', '🕊️'];
+const AVATAR_PRESETS = ['🧘‍♂️', '👨‍🏫', '👦', '🎓', '📿', '📜', '✨', '🏯', '👑', '🕊️', '💻'];
 
 export const UserProfileModal: React.FC<Props> = ({
   user,
@@ -40,13 +51,15 @@ export const UserProfileModal: React.FC<Props> = ({
   onSwitchAccount,
   onOpenLeaderboard,
 }) => {
-  const [activeTab, setActiveTab] = useState<'stats' | 'achievements' | 'edit'>('stats');
+  const isDev = user.isDeveloper || user.role === 'developer';
+  const [activeTab, setActiveTab] = useState<'stats' | 'achievements' | 'edit' | 'dev'>('stats');
 
   // Edit form state
   const [editDisplayName, setEditDisplayName] = useState(user.displayName);
   const [editAvatar, setEditAvatar] = useState(user.avatar);
   const [editFavoriteChar, setEditFavoriteChar] = useState<CharacterId>(user.favoriteCharacter);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [devActionMsg, setDevActionMsg] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
@@ -159,6 +172,26 @@ export const UserProfileModal: React.FC<Props> = ({
               >
                 Lv.{user.level}
               </span>
+              {isDev && (
+                <span
+                  style={{
+                    background: 'linear-gradient(135deg, #0284c7, #0369a1)',
+                    color: '#fff',
+                    border: '1px solid #38bdf8',
+                    borderRadius: '12px',
+                    padding: '2px 8px',
+                    fontSize: '0.72rem',
+                    fontWeight: 800,
+                    boxShadow: '0 0 10px rgba(56,189,248,0.4)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  <Terminal size={12} />
+                  DEV
+                </span>
+              )}
             </div>
 
             <div style={{ fontSize: '0.85rem', color: 'var(--accent-gold)', marginTop: '2px' }}>
@@ -198,78 +231,107 @@ export const UserProfileModal: React.FC<Props> = ({
         <div
           style={{
             display: 'flex',
-            gap: '6px',
+            gap: '4px',
             background: 'rgba(0,0,0,0.3)',
             padding: '4px',
             borderRadius: '10px',
-            marginBottom: '20px',
+            marginBottom: '16px',
+            flexWrap: 'wrap',
           }}
         >
           <button
             onClick={() => setActiveTab('stats')}
             style={{
               flex: 1,
-              padding: '8px',
+              minWidth: '70px',
+              padding: '6px 8px',
               borderRadius: '8px',
               border: 'none',
               background: activeTab === 'stats' ? 'rgba(212,175,55,0.25)' : 'transparent',
               color: activeTab === 'stats' ? 'var(--primary-gold)' : '#fff',
               fontWeight: 600,
-              fontSize: '0.85rem',
+              fontSize: '0.78rem',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '6px',
+              gap: '4px',
             }}
           >
-            <BarChart2 size={16} />
-            สถิติผลงาน
+            <BarChart2 size={14} />
+            <span>สถิติ</span>
           </button>
 
           <button
             onClick={() => setActiveTab('achievements')}
             style={{
               flex: 1,
-              padding: '8px',
+              minWidth: '85px',
+              padding: '6px 8px',
               borderRadius: '8px',
               border: 'none',
               background: activeTab === 'achievements' ? 'rgba(212,175,55,0.25)' : 'transparent',
               color: activeTab === 'achievements' ? 'var(--primary-gold)' : '#fff',
               fontWeight: 600,
-              fontSize: '0.85rem',
+              fontSize: '0.78rem',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '6px',
+              gap: '4px',
             }}
           >
-            <Award size={16} />
-            เหรียญตรา ({user.achievements ? user.achievements.length : 0}/{ACHIEVEMENTS_LIST.length})
+            <Award size={14} />
+            <span>เหรียญตรา ({user.achievements ? user.achievements.length : 0})</span>
           </button>
 
           <button
             onClick={() => setActiveTab('edit')}
             style={{
               flex: 1,
-              padding: '8px',
+              minWidth: '75px',
+              padding: '6px 8px',
               borderRadius: '8px',
               border: 'none',
               background: activeTab === 'edit' ? 'rgba(212,175,55,0.25)' : 'transparent',
               color: activeTab === 'edit' ? 'var(--primary-gold)' : '#fff',
               fontWeight: 600,
-              fontSize: '0.85rem',
+              fontSize: '0.78rem',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '6px',
+              gap: '4px',
             }}
           >
-            <Settings size={16} />
-            ตั้งค่าโปรไฟล์
+            <Settings size={14} />
+            <span>โปรไฟล์</span>
           </button>
+
+          {isDev && (
+            <button
+              onClick={() => setActiveTab('dev')}
+              style={{
+                flex: 1,
+                minWidth: '65px',
+                padding: '6px 8px',
+                borderRadius: '8px',
+                background: activeTab === 'dev' ? 'linear-gradient(135deg, #0284c7, #0369a1)' : 'rgba(6,182,212,0.1)',
+                color: activeTab === 'dev' ? '#fff' : '#38bdf8',
+                fontWeight: 700,
+                fontSize: '0.78rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '4px',
+                border: activeTab === 'dev' ? '1px solid #38bdf8' : '1px solid rgba(6,182,212,0.3)',
+              }}
+            >
+              <Cpu size={14} />
+              <span>Dev</span>
+            </button>
+          )}
         </div>
 
         {/* TAB 1: STATISTICS */}
@@ -280,39 +342,42 @@ export const UserProfileModal: React.FC<Props> = ({
               style={{
                 background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(245, 158, 11, 0.2))',
                 border: '1px solid rgba(245, 158, 11, 0.4)',
-                borderRadius: '12px',
-                padding: '14px',
-                marginBottom: '16px',
+                borderRadius: '10px',
+                padding: '10px 12px',
+                marginBottom: '12px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '8px',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <div
                   style={{
-                    width: '42px',
-                    height: '42px',
-                    borderRadius: '10px',
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '8px',
                     background: 'rgba(239, 68, 68, 0.3)',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
+                    flexShrink: 0,
                   }}
                 >
-                  <Flame size={24} color="#ef4444" />
+                  <Flame size={20} color="#ef4444" />
                 </div>
                 <div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>สถิติชนะต่อเนื่อง (Win Streak)</div>
-                  <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#f59e0b' }}>
-                    กำลังชนะต่อเนื่อง {user.stats?.currentWinStreak || 0} ตาติด
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>ชนะต่อเนื่อง (Streak)</div>
+                  <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#f59e0b' }}>
+                    กำลังชนะ {user.stats?.currentWinStreak || 0} ตาติด
                   </div>
                 </div>
               </div>
 
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>ชนะต่อเนื่องสูงสุด</div>
-                <div style={{ fontSize: '1.1rem', fontWeight: 800, color: '#fff' }}>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>สถิติสูงสุด</div>
+                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#fff' }}>
                   ⚡ {user.stats?.maxWinStreak || 0} ตาติด
                 </div>
               </div>
@@ -321,28 +386,28 @@ export const UserProfileModal: React.FC<Props> = ({
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(3, 1fr)',
-                gap: '10px',
-                marginBottom: '16px',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(95px, 1fr))',
+                gap: '8px',
+                marginBottom: '12px',
               }}
             >
-              <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '10px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.06)' }}>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>จำนวนเกมที่เล่น</div>
-                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#fff', marginTop: '4px' }}>
-                  {user.stats?.gamesPlayed || 0} เกม
+              <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px 6px', borderRadius: '8px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>เกมที่เล่น</div>
+                <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#fff', marginTop: '2px' }}>
+                  {user.stats?.gamesPlayed || 0}
                 </div>
               </div>
 
-              <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '10px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.06)' }}>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>ชนะการแข่งขัน</div>
-                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--primary-gold)', marginTop: '4px' }}>
-                  {user.stats?.gamesWon || 0} ครั้ง
+              <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px 6px', borderRadius: '8px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>ชนะทั้งหมด</div>
+                <div style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--primary-gold)', marginTop: '2px' }}>
+                  {user.stats?.gamesWon || 0}
                 </div>
               </div>
 
-              <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '10px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.06)' }}>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>อัตราการชนะ</div>
-                <div style={{ fontSize: '1.4rem', fontWeight: 700, color: '#10b981', marginTop: '4px' }}>
+              <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px 6px', borderRadius: '8px', textAlign: 'center', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>อัตราชนะ</div>
+                <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#10b981', marginTop: '2px' }}>
                   {winRate}%
                 </div>
               </div>
@@ -351,50 +416,50 @@ export const UserProfileModal: React.FC<Props> = ({
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(2, 1fr)',
-                gap: '10px',
-                marginBottom: '16px',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+                gap: '8px',
+                marginBottom: '12px',
               }}
             >
-              <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                  <BookOpen size={16} color="var(--primary-gold)" />
-                  <span>ตอบคำถามบาลีถูกต้อง</span>
+              <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  <BookOpen size={14} color="var(--primary-gold)" />
+                  <span>ตอบถูก</span>
                 </div>
-                <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#fff', marginTop: '6px' }}>
-                  {user.stats?.correctAnswers || 0} / {user.stats?.totalAnswers || 0} ข้อ
-                  <span style={{ fontSize: '0.8rem', color: 'var(--accent-gold)', marginLeft: '8px' }}>
+                <div style={{ fontSize: '1rem', fontWeight: 700, color: '#fff', marginTop: '4px' }}>
+                  {user.stats?.correctAnswers || 0} / {user.stats?.totalAnswers || 0}
+                  <span style={{ fontSize: '0.72rem', color: 'var(--accent-gold)', marginLeft: '4px' }}>
                     ({accuracyRate}%)
                   </span>
                 </div>
               </div>
 
-              <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                  <Trophy size={16} color="#3b82f6" />
-                  <span>ผ่านการสอบใหญ่ (Exam)</span>
+              <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  <Trophy size={14} color="#3b82f6" />
+                  <span>ผ่านสอบใหญ่</span>
                 </div>
-                <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#fff', marginTop: '6px' }}>
+                <div style={{ fontSize: '1rem', fontWeight: 700, color: '#fff', marginTop: '4px' }}>
                   {user.stats?.examsPassed || 0} ครั้ง
                 </div>
               </div>
 
-              <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                  <TrendingUp size={16} color="#ec4899" />
-                  <span>สำนักเรียนที่ครอบครอง</span>
+              <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  <TrendingUp size={14} color="#ec4899" />
+                  <span>วิชาที่เคยซื้อ</span>
                 </div>
-                <div style={{ fontSize: '1.2rem', fontWeight: 700, color: '#fff', marginTop: '6px' }}>
+                <div style={{ fontSize: '1rem', fontWeight: 700, color: '#fff', marginTop: '4px' }}>
                   {user.stats?.propertiesBought || 0} แห่ง
                 </div>
               </div>
 
-              <div style={{ background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.06)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                  <Sparkles size={16} color="var(--primary-gold)" />
-                  <span>แต้มปัญญารวมที่เคยได้</span>
+              <div style={{ background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  <Sparkles size={14} color="var(--primary-gold)" />
+                  <span>แต้มปัญญารวม</span>
                 </div>
-                <div style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--accent-gold)', marginTop: '6px' }}>
+                <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--accent-gold)', marginTop: '4px' }}>
                   💡 {(user.stats?.totalWisdomEarned || 0).toLocaleString()}
                 </div>
               </div>
@@ -628,6 +693,242 @@ export const UserProfileModal: React.FC<Props> = ({
               บันทึกข้อมูลส่วนตัว
             </button>
           </form>
+        )}
+
+        {/* TAB 4: DEVELOPER TOOLS */}
+        {activeTab === 'dev' && isDev && (
+          <div>
+            {/* Dev Notification Message */}
+            {devActionMsg && (
+              <div
+                style={{
+                  background: 'rgba(6, 182, 212, 0.2)',
+                  border: '1px solid #38bdf8',
+                  borderRadius: '8px',
+                  padding: '10px 14px',
+                  marginBottom: '16px',
+                  color: '#e0f2fe',
+                  fontSize: '0.85rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
+                <CheckCircle size={16} color="#38bdf8" />
+                <span>{devActionMsg}</span>
+              </div>
+            )}
+
+            {/* Developer Banner */}
+            <div
+              style={{
+                background: 'linear-gradient(135deg, rgba(2, 132, 199, 0.2), rgba(15, 23, 42, 0.8))',
+                border: '1px solid rgba(56, 189, 248, 0.4)',
+                borderRadius: '12px',
+                padding: '14px',
+                marginBottom: '16px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+                <Terminal size={22} color="#38bdf8" />
+                <h3 style={{ margin: 0, color: '#38bdf8', fontSize: '1rem', fontWeight: 700 }}>
+                  แผงควบคุมสิทธิ์ผู้พัฒนา (Developer Control Center)
+                </h3>
+              </div>
+              <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                เครื่องมือทดสอบระบบ ปรับแต่งระดับเลเวล ปลดล็อกความสำเร็จ และตรวจเช็คสถานะฐานข้อมูล
+              </p>
+            </div>
+
+            {/* Dev Controls Grid */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              
+              {/* Set Level */}
+              <div
+                style={{
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  borderRadius: '10px',
+                  padding: '12px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', color: 'var(--primary-gold)', fontSize: '0.85rem', fontWeight: 700 }}>
+                  <Zap size={16} />
+                  <span>ปรับระดับเลเวลทันที (Instant Level)</span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                  {[1, 10, 50, 99].map((lvl) => (
+                    <button
+                      key={lvl}
+                      type="button"
+                      onClick={() => {
+                        const updated = devSetLevel(user.id, lvl);
+                        if (updated) {
+                          onUpdateUser(updated);
+                          setDevActionMsg(`⚡ ปรับเลเวลสู่ Lv.${lvl} เรียบร้อยแล้ว!`);
+                          setTimeout(() => setDevActionMsg(null), 2500);
+                        }
+                      }}
+                      style={{
+                        padding: '8px',
+                        borderRadius: '6px',
+                        background: user.level === lvl ? 'rgba(56, 189, 248, 0.3)' : 'rgba(0, 0, 0, 0.4)',
+                        border: `1px solid ${user.level === lvl ? '#38bdf8' : 'rgba(255, 255, 255, 0.15)'}`,
+                        color: user.level === lvl ? '#38bdf8' : '#fff',
+                        fontWeight: 700,
+                        fontSize: '0.8rem',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                      }}
+                    >
+                      Lv.{lvl} {lvl === 99 ? '👑' : ''}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Add EXP */}
+              <div
+                style={{
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  borderRadius: '10px',
+                  padding: '12px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', color: '#38bdf8', fontSize: '0.85rem', fontWeight: 700 }}>
+                  <TrendingUp size={16} />
+                  <span>เพิ่มค่าประสบการณ์ (Add EXP)</span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+                  {[1000, 5000, 25000].map((exp) => (
+                    <button
+                      key={exp}
+                      type="button"
+                      onClick={() => {
+                        const updated = devAddExp(user.id, exp);
+                        if (updated) {
+                          onUpdateUser(updated);
+                          setDevActionMsg(`⚡ เพิ่ม +${exp.toLocaleString()} EXP สำเร็จ!`);
+                          setTimeout(() => setDevActionMsg(null), 2500);
+                        }
+                      }}
+                      style={{
+                        padding: '8px',
+                        borderRadius: '6px',
+                        background: 'rgba(2, 132, 199, 0.15)',
+                        border: '1px solid rgba(56, 189, 248, 0.4)',
+                        color: '#e0f2fe',
+                        fontWeight: 600,
+                        fontSize: '0.78rem',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      +{exp.toLocaleString()} EXP
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Special Dev Actions */}
+              <div
+                style={{
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  borderRadius: '10px',
+                  padding: '12px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#a78bfa', fontSize: '0.85rem', fontWeight: 700 }}>
+                  <Award size={16} />
+                  <span>ปลดล็อกและความสำเร็จ (Achievements)</span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const updated = devUnlockAllAchievements(user.id);
+                    if (updated) {
+                      onUpdateUser(updated);
+                      setDevActionMsg('🏆 ปลดล็อกเหรียญตราและความสำเร็จทั้งหมดแล้ว!');
+                      setTimeout(() => setDevActionMsg(null), 2500);
+                    }
+                  }}
+                  style={{
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    background: 'linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(212, 175, 55, 0.2))',
+                    border: '1px solid #a855f7',
+                    color: '#f3e8ff',
+                    fontWeight: 700,
+                    fontSize: '0.82rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <Sparkles size={16} />
+                  ปลดล็อกเหรียญตราทั้งหมด (Unlock All {ACHIEVEMENTS_LIST.length} Badges)
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirm('คุณต้องการรีเซ็ตสถิติและเลเวลของบัญชีนี้กลับเป็นเริ่มต้นหรือไม่?')) {
+                      const updated = devResetAccountStats(user.id);
+                      if (updated) {
+                        onUpdateUser(updated);
+                        setDevActionMsg('🔄 รีเซ็ตสถิติบัญชีเรียบร้อยแล้ว');
+                        setTimeout(() => setDevActionMsg(null), 2500);
+                      }
+                    }
+                  }}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: '8px',
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                    color: '#fca5a5',
+                    fontWeight: 600,
+                    fontSize: '0.78rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  <RotateCcw size={14} />
+                  รีเซ็ตสถิติทั้งหมด (Reset Stats)
+                </button>
+              </div>
+
+              {/* Developer Metadata Info */}
+              <div
+                style={{
+                  background: 'rgba(0, 0, 0, 0.4)',
+                  borderRadius: '8px',
+                  padding: '10px 12px',
+                  border: '1px solid rgba(255, 255, 255, 0.05)',
+                  fontSize: '0.75rem',
+                  color: 'var(--text-muted)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '4px',
+                }}
+              >
+                <div><strong>User ID:</strong> <code style={{ color: '#38bdf8' }}>{user.id}</code></div>
+                <div><strong>Username:</strong> <code style={{ color: '#f59e0b' }}>{user.username}</code></div>
+                <div><strong>Role:</strong> <code style={{ color: '#10b981' }}>{user.role || 'developer'}</code> (Super Admin)</div>
+                <div><strong>Session Persistence:</strong> <span style={{ color: '#10b981' }}>✓ LocalStorage (Persistent)</span></div>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Account Switcher and Logout Footer */}

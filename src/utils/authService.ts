@@ -13,7 +13,47 @@ function hashPassword(password: string): string {
   }
 }
 
+export const DEVELOPER_ACCOUNT: UserAccount = {
+  id: 'user_dev_root',
+  username: 'developer',
+  passwordHash: hashPassword('dev1234'),
+  displayName: '👑 ผู้พัฒนาระบบ (Developer)',
+  avatar: '💻',
+  favoriteCharacter: 'teacher',
+  createdAt: '2026-01-01T00:00:00.000Z',
+  lastLogin: new Date().toISOString(),
+  level: 99,
+  exp: 99999,
+  rankTitle: '👑 พระมหาเปรียญเอกสูงสุด (ผู้สร้างระบบ)',
+  role: 'developer',
+  isDeveloper: true,
+  stats: {
+    gamesPlayed: 100,
+    gamesWon: 99,
+    currentWinStreak: 99,
+    maxWinStreak: 99,
+    correctAnswers: 999,
+    totalAnswers: 1000,
+    propertiesBought: 500,
+    examsPassed: 99,
+    totalWisdomEarned: 999999,
+  },
+  reviewItems: [],
+  achievements: [
+    'first_win',
+    'streak_3',
+    'streak_5',
+    'scholar_10',
+    'scholar_50',
+    'exam_master',
+    'landlord',
+    'vocab_master',
+    'dev_badge',
+  ],
+};
+
 const INITIAL_DEMO_ACCOUNTS: UserAccount[] = [
+  DEVELOPER_ACCOUNT,
   {
     id: 'user_demo_1',
     username: 'pali_scholar',
@@ -26,6 +66,7 @@ const INITIAL_DEMO_ACCOUNTS: UserAccount[] = [
     level: 7,
     exp: 980,
     rankTitle: 'มหาเปรียญตรี (ป.ธ.๓)',
+    role: 'user',
     stats: {
       gamesPlayed: 14,
       gamesWon: 11,
@@ -52,6 +93,7 @@ const INITIAL_DEMO_ACCOUNTS: UserAccount[] = [
     level: 6,
     exp: 820,
     rankTitle: 'มหาเปรียญตรี (ป.ธ.๓)',
+    role: 'user',
     stats: {
       gamesPlayed: 12,
       gamesWon: 8,
@@ -78,6 +120,7 @@ const INITIAL_DEMO_ACCOUNTS: UserAccount[] = [
     level: 9,
     exp: 1350,
     rankTitle: 'มหาเปรียญโท (ป.ธ.๖)',
+    role: 'user',
     stats: {
       gamesPlayed: 20,
       gamesWon: 15,
@@ -102,6 +145,24 @@ export function getStoredAccounts(): UserAccount[] {
       return INITIAL_DEMO_ACCOUNTS;
     }
     const accounts: UserAccount[] = JSON.parse(raw);
+    
+    // Guarantee Developer Account always exists
+    const hasDev = accounts.some((a) => a.id === DEVELOPER_ACCOUNT.id || a.username.toLowerCase() === 'developer');
+    if (!hasDev) {
+      accounts.unshift(DEVELOPER_ACCOUNT);
+      localStorage.setItem(STORAGE_KEY_ACCOUNTS, JSON.stringify(accounts));
+    } else {
+      // Ensure role/isDeveloper is set
+      const devAcc = accounts.find((a) => a.id === DEVELOPER_ACCOUNT.id || a.username.toLowerCase() === 'developer');
+      if (devAcc) {
+        devAcc.isDeveloper = true;
+        devAcc.role = 'developer';
+        if (!devAcc.achievements.includes('dev_badge')) {
+          devAcc.achievements.push('dev_badge');
+        }
+      }
+    }
+
     return accounts;
   } catch (e) {
     console.error('Failed to load accounts from storage', e);
@@ -202,6 +263,7 @@ export function registerAccount(
     level: 1,
     exp: 0,
     rankTitle: getRankTitle(1).title,
+    role: 'user',
     stats: {
       gamesPlayed: 0,
       gamesWon: 0,
@@ -228,6 +290,8 @@ export function registerAccount(
     favoriteCharacter: newAccount.favoriteCharacter,
     level: newAccount.level,
     rankTitle: newAccount.rankTitle,
+    role: newAccount.role,
+    isDeveloper: false,
     rememberMe: true,
   };
   setStoredSession(session, true);
@@ -243,12 +307,30 @@ export function loginAccount(
   const cleanUsername = username.trim().toLowerCase();
   const accounts = getStoredAccounts();
 
-  const user = accounts.find((acc) => acc.username.toLowerCase() === cleanUsername);
+  // Check Developer Alias Login
+  const isDevLogin = cleanUsername === 'developer' || cleanUsername === 'dev' || cleanUsername === 'admin';
+  const isDevPassword =
+    password === 'dev1234' ||
+    password === 'developer' ||
+    password === 'admin123' ||
+    password === '123456';
+
+  let user = accounts.find((acc) => acc.username.toLowerCase() === cleanUsername);
+
+  if (isDevLogin && !user) {
+    user = accounts.find((acc) => acc.id === DEVELOPER_ACCOUNT.id || acc.role === 'developer');
+  }
+
   if (!user) {
     return { success: false, message: 'ไม่พบบัญชีผู้ใช้นี้ในระบบ' };
   }
 
-  if (user.passwordHash !== hashPassword(password)) {
+  // Developer special master pass check or standard hash check
+  const isPasswordValid =
+    (user.isDeveloper && (isDevPassword || user.passwordHash === hashPassword(password))) ||
+    user.passwordHash === hashPassword(password);
+
+  if (!isPasswordValid) {
     return { success: false, message: 'รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง' };
   }
 
@@ -263,11 +345,50 @@ export function loginAccount(
     favoriteCharacter: user.favoriteCharacter,
     level: user.level,
     rankTitle: user.rankTitle,
+    role: user.role,
+    isDeveloper: user.isDeveloper || user.role === 'developer',
     rememberMe,
   };
   setStoredSession(session, rememberMe);
 
-  return { success: true, message: `ยินดีต้อนรับกลับ, ${user.displayName}!`, user };
+  return {
+    success: true,
+    message: user.isDeveloper ? `⚡ ยินดีต้อนรับท่านผู้พัฒนาระบบ (${user.displayName})!` : `ยินดีต้อนรับกลับ, ${user.displayName}!`,
+    user,
+  };
+}
+
+export function loginAsDeveloper(rememberMe: boolean = true): { success: boolean; message: string; user: UserAccount } {
+  const accounts = getStoredAccounts();
+  let devAcc = accounts.find((a) => a.id === DEVELOPER_ACCOUNT.id || a.username === 'developer');
+  if (!devAcc) {
+    devAcc = { ...DEVELOPER_ACCOUNT };
+    accounts.unshift(devAcc);
+  }
+  devAcc.lastLogin = new Date().toISOString();
+  devAcc.isDeveloper = true;
+  devAcc.role = 'developer';
+  saveStoredAccounts(accounts);
+
+  const session: AuthSession = {
+    userId: devAcc.id,
+    username: devAcc.username,
+    displayName: devAcc.displayName,
+    avatar: devAcc.avatar,
+    favoriteCharacter: devAcc.favoriteCharacter,
+    level: devAcc.level,
+    rankTitle: devAcc.rankTitle,
+    role: 'developer',
+    isDeveloper: true,
+    rememberMe,
+  };
+  setStoredSession(session, rememberMe);
+
+  return {
+    success: true,
+    message: `⚡ เข้าสู่ระบบในฐานะผู้พัฒนา (Developer Mode) สำเร็จ!`,
+    user: devAcc,
+  };
 }
 
 export function switchAccount(userId: string): { success: boolean; user?: UserAccount } {
@@ -286,6 +407,8 @@ export function switchAccount(userId: string): { success: boolean; user?: UserAc
     favoriteCharacter: target.favoriteCharacter,
     level: target.level,
     rankTitle: target.rankTitle,
+    role: target.role,
+    isDeveloper: target.isDeveloper || target.role === 'developer',
     rememberMe: true,
   };
   setStoredSession(session, true);
@@ -469,4 +592,99 @@ export function getLeaderboardAccounts(
   });
 
   return sorted;
+}
+
+export function devSetLevel(userId: string, targetLevel: number): UserAccount | null {
+  const accounts = getStoredAccounts();
+  const userIndex = accounts.findIndex((a) => a.id === userId);
+  if (userIndex < 0) return null;
+
+  const user = accounts[userIndex];
+  user.level = Math.max(1, targetLevel);
+  user.exp = (user.level - 1) * 150;
+  user.rankTitle = getRankTitle(user.level).title;
+
+  accounts[userIndex] = user;
+  saveStoredAccounts(accounts);
+
+  const session = getCurrentSession();
+  if (session && session.userId === userId) {
+    session.level = user.level;
+    session.rankTitle = user.rankTitle;
+    setStoredSession(session, session.rememberMe);
+  }
+
+  return user;
+}
+
+export function devAddExp(userId: string, expBonus: number): UserAccount | null {
+  const accounts = getStoredAccounts();
+  const userIndex = accounts.findIndex((a) => a.id === userId);
+  if (userIndex < 0) return null;
+
+  const user = accounts[userIndex];
+  user.exp += expBonus;
+  user.level = Math.floor(user.exp / 150) + 1;
+  user.rankTitle = getRankTitle(user.level).title;
+
+  accounts[userIndex] = user;
+  saveStoredAccounts(accounts);
+
+  const session = getCurrentSession();
+  if (session && session.userId === userId) {
+    session.level = user.level;
+    session.rankTitle = user.rankTitle;
+    setStoredSession(session, session.rememberMe);
+  }
+
+  return user;
+}
+
+export function devUnlockAllAchievements(userId: string): UserAccount | null {
+  const accounts = getStoredAccounts();
+  const userIndex = accounts.findIndex((a) => a.id === userId);
+  if (userIndex < 0) return null;
+
+  const user = accounts[userIndex];
+  user.achievements = ACHIEVEMENTS_LIST.map((a) => a.id);
+
+  accounts[userIndex] = user;
+  saveStoredAccounts(accounts);
+
+  return user;
+}
+
+export function devResetAccountStats(userId: string): UserAccount | null {
+  const accounts = getStoredAccounts();
+  const userIndex = accounts.findIndex((a) => a.id === userId);
+  if (userIndex < 0) return null;
+
+  const user = accounts[userIndex];
+  user.level = 1;
+  user.exp = 0;
+  user.rankTitle = getRankTitle(1).title;
+  user.achievements = user.isDeveloper ? ['dev_badge'] : [];
+  user.stats = {
+    gamesPlayed: 0,
+    gamesWon: 0,
+    currentWinStreak: 0,
+    maxWinStreak: 0,
+    correctAnswers: 0,
+    totalAnswers: 0,
+    propertiesBought: 0,
+    examsPassed: 0,
+    totalWisdomEarned: 0,
+  };
+
+  accounts[userIndex] = user;
+  saveStoredAccounts(accounts);
+
+  const session = getCurrentSession();
+  if (session && session.userId === userId) {
+    session.level = user.level;
+    session.rankTitle = user.rankTitle;
+    setStoredSession(session, session.rememberMe);
+  }
+
+  return user;
 }

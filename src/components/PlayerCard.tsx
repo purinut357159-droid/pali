@@ -10,7 +10,7 @@ interface Props {
 export const PlayerCard: React.FC<Props> = ({ player, isCurrentTurn }) => {
   return (
     <div
-      className={`glass-panel ${isCurrentTurn ? 'pulse-active' : ''}`}
+      className={`glass-panel player-card-container ${isCurrentTurn ? 'pulse-active' : ''}`}
       style={{
         padding: '14px',
         borderLeft: `5px solid ${player.color}`,
@@ -20,11 +20,12 @@ export const PlayerCard: React.FC<Props> = ({ player, isCurrentTurn }) => {
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
           {player.character.avatarImage ? (
             <img
               src={player.character.avatarImage}
               alt={player.name}
+              className="player-card-avatar"
               style={{
                 width: '42px',
                 height: '42px',
@@ -32,18 +33,19 @@ export const PlayerCard: React.FC<Props> = ({ player, isCurrentTurn }) => {
                 objectFit: 'cover',
                 border: `2px solid ${player.color}`,
                 boxShadow: `0 0 10px ${player.color}`,
+                flexShrink: 0,
               }}
             />
           ) : (
-            <span style={{ fontSize: '1.6rem', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))' }}>
+            <span className="player-card-avatar" style={{ fontSize: '1.6rem', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))', flexShrink: 0 }}>
               {player.character.avatar}
             </span>
           )}
-          <div>
-            <h3 style={{ fontSize: '0.95rem', margin: 0, color: player.color }}>
+          <div style={{ minWidth: 0, overflow: 'hidden' }}>
+            <h3 className="player-card-name" style={{ fontSize: '0.95rem', margin: 0, color: player.color, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {player.name} {player.isAi && <span style={{ fontSize: '0.7rem', color: '#a0aec0' }}>(AI)</span>}
             </h3>
-            <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: 0 }}>
+            <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {player.character.name}
             </p>
           </div>
@@ -57,6 +59,7 @@ export const PlayerCard: React.FC<Props> = ({ player, isCurrentTurn }) => {
               padding: '2px 8px',
               borderRadius: '10px',
               fontWeight: 700,
+              flexShrink: 0,
             }}
           >
             กำลังเล่น
@@ -65,6 +68,7 @@ export const PlayerCard: React.FC<Props> = ({ player, isCurrentTurn }) => {
       </div>
 
       <div
+        className="player-card-wisdom"
         style={{
           background: 'rgba(0,0,0,0.3)',
           padding: '8px 10px',
@@ -84,19 +88,20 @@ export const PlayerCard: React.FC<Props> = ({ player, isCurrentTurn }) => {
         </strong>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', fontSize: '0.75rem', marginBottom: '6px' }}>
+      <div className="player-card-stats-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', fontSize: '0.75rem', marginBottom: '6px' }}>
         <div style={{ background: 'rgba(255,255,255,0.03)', padding: '4px 6px', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
           <Home size={12} color="#3b82f6" />
           <span>วิชา: {player.ownedProperties.length}</span>
         </div>
         <div style={{ background: 'rgba(255,255,255,0.03)', padding: '4px 6px', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}>
           <Award size={12} color="#10b981" />
-          <span>ถูก: {player.stats.correctAnswers} ข้อ</span>
+          <span>ถูก: {player.stats.correctAnswers}</span>
         </div>
       </div>
 
       {/* 1st Lap Status Badge */}
       <div
+        className="player-card-badge"
         style={{
           fontSize: '0.68rem',
           padding: '4px 6px',
@@ -111,7 +116,7 @@ export const PlayerCard: React.FC<Props> = ({ player, isCurrentTurn }) => {
         }}
       >
         <Flag size={12} />
-        <span>{player.hasCompletedFirstLap ? 'ปลดล็อกซื้อวิชาแล้ว (ผ่านรอบ 1)' : 'ยังไม่ครบรอบ 1 (ซื้อวิชาไม่ได้)'}</span>
+        <span>{player.hasCompletedFirstLap ? 'ปลดล็อกซื้อวิชาแล้ว' : 'ยังไม่ครบรอบ 1'}</span>
       </div>
 
       {player.isSkipTurn && (

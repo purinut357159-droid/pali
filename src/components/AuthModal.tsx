@@ -10,8 +10,15 @@ import {
   X,
   Sparkles,
   ShieldCheck,
+  Terminal,
 } from 'lucide-react';
-import { loginAccount, registerAccount, getStoredAccounts, switchAccount } from '../utils/authService';
+import {
+  loginAccount,
+  loginAsDeveloper,
+  registerAccount,
+  getStoredAccounts,
+  switchAccount,
+} from '../utils/authService';
 import type { UserAccount } from '../types/auth';
 import type { CharacterId } from '../types/game';
 import { CHARACTERS } from '../data/charactersData';
@@ -23,7 +30,7 @@ interface Props {
   initialTab?: 'login' | 'register' | 'saved';
 }
 
-const AVATAR_PRESETS = ['🧘‍♂️', '👨‍🏫', '👦', '🎓', '📿', '📜', '✨', '🏯', '👑', '🕊️'];
+const AVATAR_PRESETS = ['🧘‍♂️', '👨‍🏫', '👦', '🎓', '📿', '📜', '✨', '🏯', '👑', '🕊️', '💻'];
 
 export const AuthModal: React.FC<Props> = ({
   isOpen,
@@ -68,6 +75,19 @@ export const AuthModal: React.FC<Props> = ({
       }, 500);
     } else {
       setErrorMessage(res.message);
+    }
+  };
+
+  const handleDevLogin = () => {
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    const res = loginAsDeveloper(rememberMe);
+    if (res.success && res.user) {
+      setSuccessMessage(res.message);
+      setTimeout(() => {
+        onLoginSuccess(res.user);
+        onClose();
+      }, 400);
     }
   };
 
@@ -379,6 +399,55 @@ export const AuthModal: React.FC<Props> = ({
               <LogIn size={18} />
               เข้าสู่ระบบ
             </button>
+
+            {/* Quick Developer Login Card */}
+            <div
+              style={{
+                marginTop: '16px',
+                padding: '10px 12px',
+                borderRadius: '10px',
+                background: 'linear-gradient(135deg, rgba(6, 182, 212, 0.12), rgba(212, 175, 55, 0.12))',
+                border: '1px dashed rgba(6, 182, 212, 0.5)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '8px',
+                flexWrap: 'wrap',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                <span style={{ fontSize: '1.3rem' }}>👑</span>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#38bdf8' }}>
+                    ไอดีผู้พัฒนา (Dev ID)
+                  </div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                    User: <code style={{ color: '#f59e0b' }}>developer</code> | Pass: <code style={{ color: '#f59e0b' }}>dev1234</code>
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleDevLogin}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '8px',
+                  background: 'linear-gradient(135deg, #0284c7, #0369a1)',
+                  border: '1px solid #38bdf8',
+                  color: '#fff',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  boxShadow: '0 0 10px rgba(56, 189, 248, 0.3)',
+                }}
+              >
+                <Terminal size={13} />
+                <span>เข้าโหมด Dev (1-Click)</span>
+              </button>
+            </div>
           </form>
         )}
 
@@ -531,70 +600,97 @@ export const AuthModal: React.FC<Props> = ({
               บัญชีที่เคยล็อกอินไว้ในอุปกรณ์นี้ สามารถคลิกเพื่อเข้าใช้งานได้ทันที:
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
-              {savedAccounts.map((acc) => (
-                <div
-                  key={acc.id}
-                  onClick={() => handleQuickSwitch(acc.id)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '12px 14px',
-                    borderRadius: '10px',
-                    background: 'rgba(255,255,255,0.05)',
-                    border: '1px solid rgba(212,175,55,0.2)',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = 'var(--primary-gold)';
-                    e.currentTarget.style.background = 'rgba(212,175,55,0.15)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = 'rgba(212,175,55,0.2)';
-                    e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div
-                      style={{
-                        width: '40px',
-                        height: '40px',
-                        borderRadius: '50%',
-                        background: 'rgba(212,175,55,0.2)',
-                        border: '1px solid var(--primary-gold)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '1.4rem',
-                      }}
-                    >
-                      {acc.avatar}
-                    </div>
-                    <div>
-                      <div style={{ fontWeight: 700, color: '#fff', fontSize: '0.95rem' }}>{acc.displayName}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--accent-gold)' }}>
-                        Lv.{acc.level} • {acc.rankTitle}
+              {savedAccounts.map((acc) => {
+                const isDev = acc.isDeveloper || acc.role === 'developer';
+                return (
+                  <div
+                    key={acc.id}
+                    onClick={() => handleQuickSwitch(acc.id)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '12px 14px',
+                      borderRadius: '10px',
+                      background: isDev
+                        ? 'linear-gradient(135deg, rgba(6, 182, 212, 0.12), rgba(212, 175, 55, 0.12))'
+                        : 'rgba(255,255,255,0.05)',
+                      border: isDev ? '1.5px solid rgba(6, 182, 212, 0.6)' : '1px solid rgba(212,175,55,0.2)',
+                      boxShadow: isDev ? '0 0 15px rgba(6, 182, 212, 0.2)' : 'none',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = isDev ? '#38bdf8' : 'var(--primary-gold)';
+                      e.currentTarget.style.background = isDev
+                        ? 'rgba(6, 182, 212, 0.2)'
+                        : 'rgba(212,175,55,0.15)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = isDev ? 'rgba(6, 182, 212, 0.6)' : 'rgba(212,175,55,0.2)';
+                      e.currentTarget.style.background = isDev
+                        ? 'linear-gradient(135deg, rgba(6, 182, 212, 0.12), rgba(212, 175, 55, 0.12))'
+                        : 'rgba(255,255,255,0.05)';
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div
+                        style={{
+                          width: '40px',
+                          height: '40px',
+                          borderRadius: '50%',
+                          background: isDev ? 'rgba(6, 182, 212, 0.25)' : 'rgba(212,175,55,0.2)',
+                          border: `1px solid ${isDev ? '#38bdf8' : 'var(--primary-gold)'}`,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '1.4rem',
+                        }}
+                      >
+                        {acc.avatar}
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 700, color: '#fff', fontSize: '0.95rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span>{acc.displayName}</span>
+                          {isDev && (
+                            <span
+                              style={{
+                                fontSize: '0.65rem',
+                                background: '#0284c7',
+                                color: '#fff',
+                                padding: '1px 6px',
+                                borderRadius: '6px',
+                                fontWeight: 800,
+                              }}
+                            >
+                              DEV
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: isDev ? '#38bdf8' : 'var(--accent-gold)' }}>
+                          Lv.{acc.level} • {acc.rankTitle}
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div style={{ textAlign: 'right' }}>
-                    <span
-                      style={{
-                        fontSize: '0.75rem',
-                        background: 'rgba(212,175,55,0.2)',
-                        color: 'var(--primary-gold)',
-                        padding: '4px 8px',
-                        borderRadius: '6px',
-                        fontWeight: 600,
-                      }}
-                    >
-                      เข้าสู่ระบบ ➔
-                    </span>
+                    <div style={{ textAlign: 'right' }}>
+                      <span
+                        style={{
+                          fontSize: '0.75rem',
+                          background: isDev ? 'rgba(6, 182, 212, 0.25)' : 'rgba(212,175,55,0.2)',
+                          color: isDev ? '#38bdf8' : 'var(--primary-gold)',
+                          padding: '4px 8px',
+                          borderRadius: '6px',
+                          fontWeight: 600,
+                          border: `1px solid ${isDev ? 'rgba(6, 182, 212, 0.4)' : 'transparent'}`,
+                        }}
+                      >
+                        เข้าสู่ระบบ ➔
+                      </span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}

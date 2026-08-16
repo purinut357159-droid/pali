@@ -58,7 +58,7 @@ export const ChatWidget: React.FC = () => {
 
     if (query.includes('สมาส')) {
       return {
-        replyText: '🧩 **ความรู้เรื่องสมาส (Compounds)**:\n\nสมาส คือการย่อศัพท์ 2 ศัพท์ขึ้นไปเข้าเป็นศัพท์เดียวกัน มี 6 หมวดหลัก:\n1. กัมมธารยสมาส\n2. ทิคุสมาส\n3. ตัปปุริสสมาส\n4. ทวันทวสมาส\n5. อัพยยีภาวสมาส\n6. พหุพพีหิสมาส',
+        replyText: '🧩 **ความรู้เรื่องสมาสบาลี (Compounds)**:\n\nสมาสคือการนำนามนามตั้งแต่ 2 ศัพท์ขึ้นไปมารวมกันเป็นบทเดียว มี 6 ประเภทหลัก:\n1. กัมมธารยสมาส\n2. ทิคุสมาส\n3. ตัปปุริสสมาส\n4. ทวันทวสมาส\n5. อัพยยีภาวสมาส\n6. พหุพพิหิสมาส',
       };
     }
 
@@ -166,7 +166,7 @@ export const ChatWidget: React.FC = () => {
 
       {isOpen && (
         <div
-          className="glass-panel"
+          className="glass-panel chat-widget-window"
           style={{
             position: 'fixed',
             bottom: '96px',

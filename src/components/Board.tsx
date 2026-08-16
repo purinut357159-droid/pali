@@ -119,15 +119,15 @@ export const Board: React.FC<Props> = ({
               />
             )}
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '2px', fontWeight: 600 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '2px', fontWeight: 600, width: '100%', justifyContent: 'center' }}>
               {getTileIcon(tile)}
-              <span style={{ color: tile.color || '#fff', fontSize: '0.65rem' }}>
+              <span className="tile-name-text" style={{ color: tile.color || '#fff', fontSize: '0.65rem' }}>
                 {tile.name}
               </span>
             </div>
 
             {tile.type === 'subject' && (
-              <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>
+              <div className="tile-price-text" style={{ fontSize: '0.6rem', color: 'var(--text-muted)' }}>
                 {tile.price ? `${tile.price} 💡` : ''}
               </div>
             )}
@@ -183,7 +183,7 @@ export const Board: React.FC<Props> = ({
         <div style={{ textAlign: 'center', marginBottom: '14px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <img
             src="/images/board_logo.png"
-            alt="บาลีเศรษฐี"
+            alt="บาลีส่วนฐี"
             style={{
               width: '68px',
               height: '68px',
@@ -215,6 +215,7 @@ export const Board: React.FC<Props> = ({
 
         {/* Activity Feed Log */}
         <div
+          className="activity-log"
           style={{
             width: '100%',
             maxHeight: '110px',

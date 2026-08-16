@@ -32,6 +32,8 @@ export interface UserAccount {
   level: number;
   exp: number;
   rankTitle: string;
+  role?: 'developer' | 'admin' | 'user';
+  isDeveloper?: boolean;
   stats: UserStats;
   reviewItems: ReviewItem[];
   achievements: string[]; // List of unlocked achievement IDs
@@ -45,13 +47,15 @@ export interface AuthSession {
   favoriteCharacter: CharacterId;
   level: number;
   rankTitle: string;
+  role?: 'developer' | 'admin' | 'user';
+  isDeveloper?: boolean;
   rememberMe: boolean;
 }
 
 export const ACHIEVEMENTS_LIST: Achievement[] = [
   {
     id: 'first_win',
-    title: 'มหาเปรียญป้ายแดง',
+    title: 'ปฐมชัยชนะ',
     description: 'ชนะเกมบาลีส่วนฐีเป็นครั้งแรก',
     icon: '🏆',
   },
@@ -97,6 +101,12 @@ export const ACHIEVEMENTS_LIST: Achievement[] = [
     description: 'ท่องจำศัพท์ในสมุดทบทวน (SRS) จนชำนาญ 5 ข้อ',
     icon: '🧠',
   },
+  {
+    id: 'dev_badge',
+    title: 'ผู้สร้างระบบบาลีส่วนฐี',
+    description: 'บัญชีเกียรติยศระดับผู้พัฒนาเกม (Developer ID)',
+    icon: '🛠️',
+  },
 ];
 
 export const RANK_TITLES: { minLevel: number; title: string; badge: string }[] = [
@@ -106,6 +116,9 @@ export const RANK_TITLES: { minLevel: number; title: string; badge: string }[] =
   { minLevel: 8, title: 'มหาเปรียญโท (ป.ธ.๖)', badge: '🥈' },
   { minLevel: 12, title: 'มหาเปรียญเอก (ป.ธ.๙)', badge: '🥇' },
   { minLevel: 16, title: 'พระอาจารย์ใหญ่แห่งสำนักเรียน', badge: '👑' },
+  { minLevel: 25, title: 'มหาปราชญ์บาลีขั้นสูง', badge: '🔮' },
+  { minLevel: 50, title: 'อัครมหาบัณฑิตผู้ทรงธรรม', badge: '💎' },
+  { minLevel: 99, title: '👑 พระมหาเปรียญเอกสูงสุด (ผู้สร้างระบบ)', badge: '⚡' },
 ];
 
 export function getRankTitle(level: number): { title: string; badge: string } {

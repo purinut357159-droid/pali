@@ -230,12 +230,16 @@ export const QuizModal: React.FC<Props> = ({
               {title}
             </h3>
 
-            <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)', marginBottom: '20px', lineHeight: 1.6, maxWidth: '440px' }}>
-              {mode === 'buy' && 'กดปุ่มด้านล่างเพื่อเริ่มทำข้อสอบ (จะเริ่มนับเวลาถอยหลัง 15 วินาที) ตอบให้ถูกต้องเพื่อครอบครองวิชานี้! (⚠️ ตอบผิดสะสมครบ 3 ข้อ จะถูกส่งเข้าสนามติวเข้มพิเศษ ช่อง 20)'}
-              {mode === 'upgrade' && 'กดปุ่มด้านล่างเพื่อเริ่มทำข้อสอบ (จะเริ่มนับเวลาถอยหลัง 15 วินาที) ตอบให้ถูกต้องเพื่ออัปเกรดสำนักเรียน! (⚠️ ตอบผิดสะสมครบ 3 ข้อ จะถูกส่งเข้าสนามติวเข้มพิเศษ ช่อง 20)'}
-              {mode === 'quiz' && 'ห้องติวเพิ่มเติม: มีเวลา 15 วินาที ตอบถูกรับ +150 แต้ม (⚠️ หากตอบผิดสะสมครบ 3 ข้อ จะถูกส่งเข้าสนามติวเข้มพิเศษ ช่อง 20 และหยุดเดิน 1 ตา)'}
-              {mode === 'exam' && 'สนามสอบเปรียญ: มีเวลา 15 วินาที ตอบถูกรับแต้มปัญญาโบนัสใหญ่ +300 แต้ม! (⚠️ ตอบผิดสะสมครบ 3 ข้อ จะถูกส่งเข้าสนามติวเข้มพิเศษ ช่อง 20)'}
-              {mode === 'rent' && 'ตอบคำถามบาลีให้ถูกต้องเพื่อรับส่วนลดค่าผ่านทาง 50%! (⚠️ ตอบผิดสะสมครบ 3 ข้อ จะถูกส่งเข้าสนามติวเข้มพิเศษ ช่อง 20)'}
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '16px', lineHeight: 1.5, maxWidth: '440px' }}>
+              {mode === 'buy' && 'ตอบคำถามบาลีให้ถูกต้องภายใน 15 วินาที เพื่อรับสิทธิ์ครอบครองวิชา!'}
+              {mode === 'upgrade' && 'ตอบคำถามบาลีให้ถูกต้องภายใน 15 วินาที เพื่ออัปเกรดสำนักเรียน!'}
+              {mode === 'quiz' && 'ห้องติวพิเศษ: ตอบถูกรับ +150 แต้มปัญญา ภายใน 15 วินาที!'}
+              {mode === 'exam' && 'สนามสอบเปรียญ: ตอบถูกรับแต้มปัญญาโบนัสใหญ่ +300 แต้ม!'}
+              {mode === 'rent' && 'ตอบคำถามบาลีให้ถูกต้องเพื่อรับส่วนลดค่าผ่านทาง 50%!'}
+              <br />
+              <span style={{ fontSize: '0.75rem', color: '#fca5a5' }}>
+                (⚠️ ตอบผิดสะสมครบ 3 ข้อ จะถูกส่งเข้าสนามติวเข้มพิเศษ ช่อง 20)
+              </span>
             </p>
 
             <div
@@ -243,26 +247,26 @@ export const QuizModal: React.FC<Props> = ({
                 width: '100%',
                 background: 'rgba(0,0,0,0.3)',
                 border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: '12px',
-                padding: '12px 16px',
-                marginBottom: '22px',
-                fontSize: '0.85rem',
+                borderRadius: '10px',
+                padding: '10px 12px',
+                marginBottom: '18px',
+                fontSize: '0.82rem',
                 display: 'grid',
                 gridTemplateColumns: 'repeat(3, 1fr)',
-                gap: '8px',
+                gap: '6px',
                 textAlign: 'center',
               }}
             >
               <div>
-                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>หมวดวิชา</div>
+                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>หมวดวิชา</div>
                 <strong style={{ color: 'var(--primary-gold)' }}>{question.category}</strong>
               </div>
               <div>
-                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>ความยาก</div>
+                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>ความยาก</div>
                 <strong style={{ color: '#fbbf24' }}>{renderStars(question.level)}</strong>
               </div>
               <div>
-                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>เวลาตอบ</div>
+                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>เวลาตอบ</div>
                 <strong style={{ color: '#4ade80' }}>15.0 วินาที</strong>
               </div>
             </div>
@@ -273,19 +277,19 @@ export const QuizModal: React.FC<Props> = ({
                 audioManager.playDiceRoll();
               }}
               className="gold-button pulse-active"
-              style={{ width: '100%', justifyContent: 'center', padding: '14px', fontSize: '1.05rem' }}
+              style={{ width: '100%', justifyContent: 'center', padding: '12px', fontSize: '1rem' }}
             >
-              <Sparkles size={20} />
-              ⚡ ตกลง พร้อมตอบคำถาม (เริ่มจับเวลา)
+              <Sparkles size={18} />
+              ⚡ พร้อมตอบคำถาม (เริ่มจับเวลา)
             </button>
 
             {canUseFreeCard && onUseFreeCard && (
               <button
                 onClick={handleUseFreeCardLocal}
                 className="secondary-button"
-                style={{ marginTop: '12px', width: '100%', justifyContent: 'center', gap: '6px', fontSize: '0.85rem' }}
+                style={{ marginTop: '10px', width: '100%', justifyContent: 'center', gap: '6px', fontSize: '0.8rem', padding: '8px 12px' }}
               >
-                <Sparkles size={16} color="var(--primary-gold)" />
+                <Sparkles size={14} color="var(--primary-gold)" />
                 ใช้การ์ดผ่านฟรี ({player.freeAnswerCards}) ข้ามข้อนี้ทันที
               </button>
             )}
@@ -297,20 +301,20 @@ export const QuizModal: React.FC<Props> = ({
               style={{
                 background: 'rgba(10, 17, 35, 0.8)',
                 border: '1px solid rgba(255, 255, 255, 0.1)',
-                borderRadius: '12px',
-                padding: '10px 14px',
-                marginBottom: '16px',
+                borderRadius: '10px',
+                padding: '8px 12px',
+                marginBottom: '14px',
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', fontSize: '0.85rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: isUrgent && !isAnswered ? '#f87171' : '#f8f9fa', fontWeight: 600 }}>
-                  <Timer size={16} color={isUrgent && !isAnswered ? '#ef4444' : 'var(--primary-gold)'} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px', fontSize: '0.8rem', flexWrap: 'wrap', gap: '4px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', color: isUrgent && !isAnswered ? '#f87171' : '#f8f9fa', fontWeight: 600 }}>
+                  <Timer size={14} color={isUrgent && !isAnswered ? '#ef4444' : 'var(--primary-gold)'} />
                   <span>
                     {isAnswered
                       ? isTimeout
                         ? '⌛ หมดเวลา'
                         : `⏱️ ใช้เวลา: ${timeTaken.toFixed(1)} วิ`
-                      : `⏱️ เวลาที่เหลือ: ${timeLeft.toFixed(1)} วินาที`}
+                      : `⏱️ เหลือ: ${timeLeft.toFixed(1)} วินาที`}
                   </span>
                 </div>
 
@@ -323,24 +327,21 @@ export const QuizModal: React.FC<Props> = ({
                       gap: '4px',
                       color: 'var(--primary-gold)',
                       fontWeight: 700,
-                      fontSize: '0.82rem',
-                      padding: '2px 8px',
-                      borderRadius: '8px',
+                      fontSize: '0.75rem',
+                      padding: '2px 6px',
+                      borderRadius: '6px',
                       border: '1px solid rgba(212, 175, 55, 0.4)',
                     }}
                   >
                     {isPropertyMode ? (
                       <>
-                        <Sparkles size={14} color="#f59e0b" />
-                        {mode === 'buy' ? '🎯 ตอบถูกเพื่อซื้อวิชา' : '🏫 ตอบถูกเพื่ออัปเกรด'}
+                        <Sparkles size={12} color="#f59e0b" />
+                        <span>{mode === 'buy' ? '🎯 ตอบถูกเพื่อซื้อวิชา' : '🏫 ตอบถูกเพื่ออัปเกรด'}</span>
                       </>
                     ) : (
                       <>
-                        <Zap size={14} color="#f59e0b" />
-                        โบนัสความเร็ว: +{currentLiveBonus} แต้ม
-                        {charMultiplier > 1 && (
-                          <span style={{ fontSize: '0.7rem', color: '#6ee7b7' }}>({charMultiplier}x)</span>
-                        )}
+                        <Zap size={12} color="#f59e0b" />
+                        <span>+{currentLiveBonus} แต้ม {charMultiplier > 1 ? `(${charMultiplier}x)` : ''}</span>
                       </>
                     )}
                   </div>

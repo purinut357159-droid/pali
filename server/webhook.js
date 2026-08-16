@@ -1,7 +1,7 @@
 /**
  * LINE Official Account (LINE Messaging API) Webhook Handler Template
  * 
- * สำหรับโปรเจกต์ บาลีเศรษฐี (Pali Tycoon)
+ * สำหรับโปรเจกต์ บาลีส่วนฐี (Pali Tycoon)
  * 
  * การใช้งาน:
  * 1. นำไฟล์นี้ไปปรับใช้บน Backend (เช่น Node.js / Express / Vercel Serverless / Railway)
@@ -43,13 +43,13 @@ async function handleEvent(event) {
   if (userMessage === 'สุ่มคำถาม' || userMessage === 'บาลี') {
     return client.replyMessage(event.replyToken, {
       type: 'text',
-      text: '🎲 คำถามบาลีเศรษฐี:\n\n"พุทฺโธ" แปลว่าอะไร?\n1. ผู้รู้ ผู้ตื่น ผู้เบิกบาน\n2. พระผู้มีพระภาคเจ้า\n3. พระธรรมคำสอน\n\n(พิมพ์คำตอบ 1, 2 หรือ 3 เพื่อตอบ!)',
+      text: '🎲 คำถามบาลีส่วนฐี:\n\n"พุทฺโธ" แปลว่าอะไร?\n1. ผู้รู้ ผู้ตื่น ผู้เบิกบาน\n2. พระผู้มีพระภาคเจ้า\n3. พระธรรมคำสอน\n\n(พิมพ์คำตอบ 1, 2 หรือ 3 เพื่อตอบ!)',
     });
   }
 
   return client.replyMessage(event.replyToken, {
     type: 'text',
-    text: `ยินดีต้อนรับสู่ บาลีเศรษฐี (Pali Tycoon)!\n\nพิมพ์ "บาลี" หรือ "สุ่มคำถาม" เพื่อเริ่มทดสอบความรู้ภาษาบาลีได้เลยครับ 🙏`,
+    text: `ยินดีต้อนรับสู่ บาลีส่วนฐี (Pali Tycoon)!\n\nพิมพ์ "บาลี" หรือ "สุ่มคำถาม" เพื่อเริ่มทดสอบความรู้ภาษาบาลีได้เลยครับ 🙏`,
   });
 }
 
