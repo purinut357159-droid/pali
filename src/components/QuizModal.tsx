@@ -238,7 +238,7 @@ export const QuizModal: React.FC<Props> = ({
               {mode === 'rent' && 'ตอบคำถามบาลีให้ถูกต้องเพื่อรับส่วนลดค่าผ่านทาง 50%!'}
               <br />
               <span style={{ fontSize: '0.75rem', color: '#fca5a5' }}>
-                (⚠️ ตอบผิดสะสมครบ 3 ข้อ จะถูกส่งเข้าสนามติวเข้มพิเศษ ช่อง 20)
+                (⚠️ ตอบผิด/หมดเวลา: หัก {mode === 'exam' ? '150' : '100'} แต้มปัญญา และหากผิดสะสมครบ 3 ข้อ จะถูกส่งเข้าสนามติวเข้มพิเศษ ช่อง 20)
               </span>
             </p>
 
@@ -346,7 +346,7 @@ export const QuizModal: React.FC<Props> = ({
                     )}
                   </div>
                 ) : (
-                  selectedIndex === question.correctAnswer && !isTimeout && (
+                  selectedIndex === question.correctAnswer && !isTimeout ? (
                     <div
                       style={{
                         display: 'flex',
@@ -368,6 +368,20 @@ export const QuizModal: React.FC<Props> = ({
                           โบนัสตอบไว: +{earnedBonus} แต้ม!
                         </>
                       )}
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                        color: '#f87171',
+                        fontWeight: 700,
+                        fontSize: '0.85rem',
+                      }}
+                    >
+                      <XCircle size={14} color="#ef4444" />
+                      <span>{mode === 'rent' ? '❌ ตอบผิด! จ่ายค่าผ่านทางเต็ม' : `❌ ตอบผิด! หัก -${mode === 'exam' ? '150' : '100'} แต้ม`}</span>
                     </div>
                   )
                 )}

@@ -24,6 +24,7 @@ interface Props {
   isDiceRolled: boolean;
   dice: [number, number];
   logs: GameLog[];
+  canRollDice?: boolean;
 }
 
 export const Board: React.FC<Props> = ({
@@ -36,6 +37,7 @@ export const Board: React.FC<Props> = ({
   isDiceRolled,
   dice,
   logs,
+  canRollDice = true,
 }) => {
   const getTileIcon = (tile: BoardTile) => {
     switch (tile.type) {
@@ -208,7 +210,7 @@ export const Board: React.FC<Props> = ({
             dice={dice}
             isDiceRolled={isDiceRolled}
             onRollDice={onRollDice}
-            disabled={currentTurnPlayer.isAi || !!movingPlayerId}
+            disabled={!canRollDice || currentTurnPlayer.isAi || !!movingPlayerId}
             doublesStreak={currentTurnPlayer.doublesStreak}
           />
         </div>

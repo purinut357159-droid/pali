@@ -20,6 +20,27 @@ export interface Achievement {
   unlockedAt?: string; // ISO date
 }
 
+export interface FriendRequest {
+  fromUserId: string;
+  timestamp: string;
+  message?: string;
+}
+
+export interface OutgoingFriendRequest {
+  toUserId: string;
+  timestamp: string;
+}
+
+export interface GameInvite {
+  id: string;
+  fromUserId: string;
+  fromDisplayName: string;
+  fromAvatar: string;
+  toUserId: string;
+  roomCode: string;
+  timestamp: string;
+}
+
 export interface UserAccount {
   id: string;
   username: string;
@@ -37,6 +58,9 @@ export interface UserAccount {
   stats: UserStats;
   reviewItems: ReviewItem[];
   achievements: string[]; // List of unlocked achievement IDs
+  friendIds?: string[];
+  incomingFriendRequests?: FriendRequest[];
+  outgoingFriendRequests?: OutgoingFriendRequest[];
 }
 
 export interface AuthSession {

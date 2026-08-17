@@ -163,6 +163,13 @@ export function getStoredAccounts(): UserAccount[] {
       }
     }
 
+    // Guarantee friend arrays are initialized on all accounts
+    accounts.forEach((acc) => {
+      acc.friendIds = acc.friendIds || [];
+      acc.incomingFriendRequests = acc.incomingFriendRequests || [];
+      acc.outgoingFriendRequests = acc.outgoingFriendRequests || [];
+    });
+
     return accounts;
   } catch (e) {
     console.error('Failed to load accounts from storage', e);

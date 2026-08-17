@@ -38,6 +38,7 @@ interface Props {
   onLogout: () => void;
   onSwitchAccount: () => void;
   onOpenLeaderboard?: () => void;
+  onOpenFriends?: () => void;
 }
 
 const AVATAR_PRESETS = ['🧘‍♂️', '👨‍🏫', '👦', '🎓', '📿', '📜', '✨', '🏯', '👑', '🕊️', '💻'];
@@ -50,6 +51,7 @@ export const UserProfileModal: React.FC<Props> = ({
   onLogout,
   onSwitchAccount,
   onOpenLeaderboard,
+  onOpenFriends,
 }) => {
   const isDev = user.isDeveloper || user.role === 'developer';
   const [activeTab, setActiveTab] = useState<'stats' | 'achievements' | 'edit' | 'dev'>('stats');
@@ -194,8 +196,35 @@ export const UserProfileModal: React.FC<Props> = ({
               )}
             </div>
 
-            <div style={{ fontSize: '0.85rem', color: 'var(--accent-gold)', marginTop: '2px' }}>
-              {rankInfo.badge} {user.rankTitle || rankInfo.title}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px', marginTop: '2px' }}>
+              <div style={{ fontSize: '0.85rem', color: 'var(--accent-gold)' }}>
+                {rankInfo.badge} {user.rankTitle || rankInfo.title}
+              </div>
+
+              {onOpenFriends && (
+                <button
+                  onClick={() => {
+                    onClose();
+                    onOpenFriends();
+                  }}
+                  style={{
+                    background: 'rgba(56, 189, 248, 0.15)',
+                    border: '1px solid rgba(56, 189, 248, 0.4)',
+                    borderRadius: '8px',
+                    padding: '2px 8px',
+                    fontSize: '0.72rem',
+                    color: '#38bdf8',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    fontWeight: 600,
+                  }}
+                >
+                  <Users size={12} />
+                  <span>เพื่อน ({user.friendIds?.length || 0})</span>
+                </button>
+              )}
             </div>
 
             {/* EXP Progress Bar */}

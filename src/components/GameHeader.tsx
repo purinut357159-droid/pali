@@ -1,5 +1,5 @@
 import React from 'react';
-import { Volume2, VolumeX, BookOpen, RefreshCw, LogIn, Trophy } from 'lucide-react';
+import { Volume2, VolumeX, BookOpen, RefreshCw, LogIn, Trophy, Users, Globe } from 'lucide-react';
 import type { GameState } from '../types/game';
 import type { UserAccount } from '../types/auth';
 
@@ -13,6 +13,11 @@ interface Props {
   onOpenAuthModal: () => void;
   onOpenProfileModal: () => void;
   onOpenLeaderboard: () => void;
+  onOpenFriends: () => void;
+  onOpenOnlineLobby: () => void;
+  isOnline?: boolean;
+  onlineRoomCode?: string | null;
+  friendRequestCount?: number;
 }
 
 export const GameHeader: React.FC<Props> = ({
@@ -25,6 +30,11 @@ export const GameHeader: React.FC<Props> = ({
   onOpenAuthModal,
   onOpenProfileModal,
   onOpenLeaderboard,
+  onOpenFriends,
+  onOpenOnlineLobby,
+  isOnline = false,
+  onlineRoomCode = null,
+  friendRequestCount = 0,
 }) => {
   const currentTurnPlayer = gameState.players[gameState.currentTurnPlayerIndex];
   const dueReviewsCount = gameState.reviewItems.filter((i) => !i.mastered).length;
@@ -116,6 +126,79 @@ export const GameHeader: React.FC<Props> = ({
             >
               <LogIn size={16} />
               <span>เข้าสู่ระบบ / สมาชิก</span>
+            </button>
+          )}
+
+          {/* Friends Button */}
+          <button
+            onClick={onOpenFriends}
+            className="secondary-button"
+            style={{ display: 'flex', alignItems: 'center', gap: '6px', position: 'relative' }}
+            title="เปิดระบบเพื่อนและคำขอเป็นเพื่อน"
+          >
+            <Users size={18} color="#38bdf8" />
+            <span style={{ fontSize: '0.85rem' }}>เพื่อน</span>
+            {friendRequestCount > 0 && (
+              <span
+                style={{
+                  position: 'absolute',
+                  top: '-5px',
+                  right: '-5px',
+                  background: '#ef4444',
+                  color: '#fff',
+                  borderRadius: '50%',
+                  width: '18px',
+                  height: '18px',
+                  fontSize: '0.68rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 800,
+                  boxShadow: '0 2px 6px rgba(239,68,68,0.6)',
+                }}
+              >
+                {friendRequestCount}
+              </span>
+            )}
+          </button>
+
+          {/* Online Room Button / Badge */}
+          {isOnline && onlineRoomCode ? (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(212, 175, 55, 0.2))',
+                border: '1.5px solid #38bdf8',
+                borderRadius: '10px',
+                padding: '6px 10px',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                color: '#38bdf8',
+              }}
+            >
+              <Globe size={15} />
+              <span>ห้อง: {onlineRoomCode}</span>
+            </div>
+          ) : (
+            <button
+              onClick={onOpenOnlineLobby}
+              className="gold-button"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 12px',
+                fontSize: '0.85rem',
+                background: 'linear-gradient(135deg, #0284c7 0%, #38bdf8 100%)',
+                color: '#fff',
+                boxShadow: '0 4px 15px rgba(2, 132, 199, 0.4)',
+              }}
+              title="สร้างห้องหรือเข้าร่วมห้องเล่นออนไลน์กับเพื่อน"
+            >
+              <Globe size={16} />
+              <span>เล่นออนไลน์</span>
             </button>
           )}
 

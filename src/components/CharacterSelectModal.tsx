@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { CHARACTERS } from '../data/charactersData';
 import type { Character, GameMode } from '../types/game';
 import type { UserAccount } from '../types/auth';
-import { Play, Users, Bot, Sparkles } from 'lucide-react';
+import { Play, Users, Bot, Sparkles, Globe, UserPlus } from 'lucide-react';
 
 export interface PlayerSetupConfig {
   name: string;
@@ -15,12 +15,16 @@ interface Props {
   currentUser?: UserAccount | null;
   onOpenAuthModal?: () => void;
   onOpenLeaderboard?: () => void;
+  onOpenOnlineLobby?: () => void;
+  onOpenFriends?: () => void;
 }
 
 export const CharacterSelectModal: React.FC<Props> = ({
   onStartGame,
   currentUser,
   onOpenAuthModal,
+  onOpenOnlineLobby,
+  onOpenFriends,
 }) => {
   const [playType, setPlayType] = useState<'ai' | 'pass_play'>('ai');
 
@@ -183,6 +187,54 @@ export const CharacterSelectModal: React.FC<Props> = ({
               {currentUser ? 'สลับบัญชี' : 'เข้าสู่ระบบ'}
             </button>
           )}
+        </div>
+
+        {/* Online & Friends Feature Cards */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+          {onOpenOnlineLobby && (
+            <button
+              onClick={onOpenOnlineLobby}
+              className="gold-button"
+              style={{
+                padding: '8px 12px',
+                fontSize: '0.82rem',
+                justifyContent: 'center',
+                borderRadius: '10px',
+                background: 'linear-gradient(135deg, #0284c7 0%, #38bdf8 100%)',
+                color: '#fff',
+                boxShadow: '0 4px 15px rgba(2, 132, 199, 0.4)',
+              }}
+            >
+              <Globe size={16} />
+              <span>🌐 เล่นออนไลน์กับเพื่อน</span>
+            </button>
+          )}
+
+          {onOpenFriends && (
+            <button
+              onClick={onOpenFriends}
+              className="secondary-button"
+              style={{
+                padding: '8px 12px',
+                fontSize: '0.82rem',
+                justifyContent: 'center',
+                borderRadius: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                borderColor: 'rgba(56, 189, 248, 0.4)',
+              }}
+            >
+              <UserPlus size={16} color="#38bdf8" />
+              <span>👥 ระบบแอดเพื่อน</span>
+            </button>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '2px 0' }}>
+          <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.1)' }} />
+          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>หรือเล่นในเครื่องนี้</span>
+          <div style={{ flex: 1, height: '1px', background: 'rgba(255, 255, 255, 0.1)' }} />
         </div>
 
         {/* Play Mode Tabs */}

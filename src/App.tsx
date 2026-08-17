@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { GameState, Player, BoardTile, Question, CardEffect, GameMode } from './types/game';
-import type { UserAccount } from './types/auth';
+import type { UserAccount, GameInvite } from './types/auth';
+import type { RoomMember, RoomSettings } from './types/multiplayer';
 import { BOARD_TILES } from './data/boardConfig';
 import { QUESTION_BANK } from './data/questionBank';
 import { BOON_CARDS, KARMA_CARDS } from './data/cardsData';
@@ -18,6 +19,9 @@ import { ChatWidget } from './components/ChatWidget';
 import { AuthModal } from './components/AuthModal';
 import { UserProfileModal } from './components/UserProfileModal';
 import { LeaderboardModal } from './components/LeaderboardModal';
+import { FriendsModal } from './components/FriendsModal';
+import { OnlineLobbyModal } from './components/OnlineLobbyModal';
+import { InGameOnlineChat } from './components/InGameOnlineChat';
 import { addWrongQuestionToSRS, markQuestionMastered } from './utils/srsEngine';
 import { audioManager } from './utils/audioManager';
 import {
@@ -26,6 +30,9 @@ import {
   syncUserReviewDeck,
 } from './utils/authService';
 import { checkPropertyCombo, UPGRADE_NAMES } from './utils/comboEngine';
+import { multiplayerService } from './utils/multiplayerService';
+import { getPendingInvitesForUser, clearInvite } from './utils/friendService';
+import { Check, X, Sparkles } from 'lucide-react';
 
 function shuffleQuestionOptions(q: Question): Question {
   const originalCorrectText = q.options[q.correctAnswer];
@@ -51,7 +58,18 @@ export const App: React.FC = () => {
   const [authModalTab, setAuthModalTab] = useState<'login' | 'register' | 'saved'>('login');
   const [showProfileModal, setShowProfileModal] = useState<boolean>(false);
   const [showLeaderboardModal, setShowLeaderboardModal] = useState<boolean>(false);
+  const [showFriendsModal, setShowFriendsModal] = useState<boolean>(false);
+  const [showOnlineLobbyModal, setShowOnlineLobbyModal] = useState<boolean>(false);
   const [matchRecorded, setMatchRecorded] = useState<boolean>(false);
+
+  // Online Multiplayer State
+  const [isOnlineMatch, setIsOnlineMatch] = useState<boolean>(false);
+  const [onlineRoomSettings, setOnlineRoomSettings] = useState<RoomSettings | null>(null);
+  const [, setOnlineRoomMembers] = useState<RoomMember[]>([]);
+  const [myOnlineMemberId, setMyOnlineMemberId] = useState<string>('');
+  const [initialRoomCode, setInitialRoomCode] = useState<string | null>(null);
+  const [activeInviteBanner, setActiveInviteBanner] = useState<GameInvite | null>(null);
+  const [remotePlayerNotice, setRemotePlayerNotice] = useState<string | null>(null);
 
   const [gameState, setGameState] = useState<GameState>({
     mode: 'points',
@@ -82,6 +100,47 @@ export const App: React.FC = () => {
   const [rolledDoubles, setRolledDoubles] = useState<boolean>(false);
   const [movingPlayerId, setMovingPlayerId] = useState<string | null>(null);
 
+  // Parse URL query parameter ?room=PALI-XXXX on mount
+  useEffect(() => {
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const roomParam = urlParams.get('room');
+      if (roomParam) {
+        const clean = roomParam.trim().toUpperCase();
+        setInitialRoomCode(clean);
+        setShowOnlineLobbyModal(true);
+      }
+    } catch {}
+  }, []);
+
+  // Check for incoming game invites
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const checkInvites = () => {
+      const pending = getPendingInvitesForUser(currentUser.id);
+      if (pending.length > 0) {
+        setActiveInviteBanner(pending[0]);
+      }
+    };
+
+    checkInvites();
+
+    const handleAccountSync = () => {
+      checkInvites();
+      const updatedUser = getCurrentUser();
+      if (updatedUser) setCurrentUser(updatedUser);
+    };
+
+    window.addEventListener('pali_accounts_updated', handleAccountSync);
+    window.addEventListener('storage', handleAccountSync);
+
+    return () => {
+      window.removeEventListener('pali_accounts_updated', handleAccountSync);
+      window.removeEventListener('storage', handleAccountSync);
+    };
+  }, [currentUser]);
+
   // Sync initial review items if user logs in
   useEffect(() => {
     if (currentUser?.reviewItems && gameState.gameStatus === 'setup') {
@@ -105,9 +164,15 @@ export const App: React.FC = () => {
     }));
   };
 
+  // -------------------------------------------------------------
+  // START GAME (Local & Online)
+  // -------------------------------------------------------------
+
   const handleStartGame = (configs: PlayerSetupConfig[], mode: GameMode, rounds: number) => {
     const playerColors = ['#f59e0b', '#3b82f6', '#ec4899', '#10b981'];
     setMatchRecorded(false);
+    setIsOnlineMatch(false);
+    setOnlineRoomSettings(null);
 
     const newPlayers: Player[] = configs.map((cfg, idx) => ({
       id: `p_${idx + 1}`,
@@ -148,11 +213,109 @@ export const App: React.FC = () => {
     addLog(`🎲 เริ่มเกมบาลีส่วนฐี (${configs.length} ผู้เล่น)! ผู้เล่นทุกคนเริ่มด้วย 2,000 แต้มปัญญาเท่ากัน`, 'success');
   };
 
+  const handleStartOnlineGame = (roomMembers: RoomMember[], settings: RoomSettings) => {
+    setMatchRecorded(false);
+    setIsOnlineMatch(true);
+    setOnlineRoomSettings(settings);
+    setOnlineRoomMembers(roomMembers);
+    setMyOnlineMemberId(multiplayerService.currentMemberId);
+    setShowOnlineLobbyModal(false);
+
+    const newPlayers: Player[] = roomMembers.map((m) => ({
+      id: m.id,
+      name: m.displayName,
+      character: m.character,
+      wisdomPoints: 2000,
+      position: 0,
+      isAi: !!m.isAi,
+      aiDifficulty: 'medium',
+      color: m.color,
+      isSkipTurn: false,
+      isBankrupt: false,
+      hasCompletedFirstLap: false,
+      doublesStreak: 0,
+      tutoringWrongCount: 0,
+      freeAnswerCards: m.character.id === 'student' ? 1 : 0,
+      ownedProperties: [],
+      exp: 0,
+      level: 1,
+      stats: { correctAnswers: 0, totalAnswers: 0, propertiesBought: 0, examsPassed: 0 },
+    }));
+
+    setGameState({
+      mode: settings.mode,
+      maxRounds: settings.maxRounds,
+      currentRound: 1,
+      currentTurnPlayerIndex: 0,
+      players: newPlayers,
+      tiles: BOARD_TILES.map((t) => ({ ...t, ownerId: null, upgradeLevel: 0 })),
+      dice: [1, 1],
+      isDiceRolled: false,
+      gameStatus: 'playing',
+      logs: [],
+      reviewItems: currentUser?.reviewItems || gameState.reviewItems,
+      askedQuestionIds: [],
+    });
+
+    addLog(`🌐 เริ่มการแข่งขันออนไลน์ ห้อง "${settings.roomCode}" (${newPlayers.length} ผู้เล่น)!`, 'success');
+  };
+
+  // -------------------------------------------------------------
+  // MULTIPLAYER NETWORK SYNC LISTENERS
+  // -------------------------------------------------------------
+
+  useEffect(() => {
+    if (!isOnlineMatch) return;
+
+    const unsubs = [
+      multiplayerService.on('dice_roll', (payload: any) => {
+        executeDiceRoll(payload.d1, payload.d2, false);
+      }),
+
+      multiplayerService.on('quiz_open', (payload: any) => {
+        const { question, title, targetTile, mode, turnPlayerId } = payload;
+        if (turnPlayerId === multiplayerService.currentMemberId) {
+          setActiveQuiz({ question, title, targetTile, mode });
+        } else {
+          const turnPlayer = gameState.players.find((p) => p.id === turnPlayerId);
+          setRemotePlayerNotice(`⏳ ${turnPlayer?.name || 'ผู้เล่น'} กำลังตอบคำถามบาลี: ${title}`);
+        }
+      }),
+
+      multiplayerService.on('quiz_answer_result', (payload: any) => {
+        setRemotePlayerNotice(null);
+        handleAnswerQuiz(payload.isCorrect, payload.speedBonus, payload.timeTaken, false);
+      }),
+
+      multiplayerService.on('tile_detail_action', (payload: any) => {
+        const { action, tileId } = payload;
+        const tile = gameState.tiles.find((t) => t.id === tileId);
+        if (tile) {
+          if (action === 'buy') {
+            triggerQuestion(tile, 'buy', `ตอบคำถามบาลีเพื่อซื้อวิชา "${tile.name}"`, false);
+          } else if (action === 'upgrade') {
+            triggerQuestion(tile, 'upgrade', `ตอบคำถามบาลีเพื่ออัปเกรดสำนักเรียน "${tile.name}"`, false);
+          }
+        }
+      }),
+
+      multiplayerService.on('turn_change', () => {
+        nextTurn(false);
+      }),
+    ];
+
+    return () => {
+      unsubs.forEach((fn) => fn());
+    };
+  }, [isOnlineMatch, gameState.players, gameState.tiles, gameState.currentTurnPlayerIndex]);
+
   // Check Game Over and Record Results to User Profile
   useEffect(() => {
     if (gameState.gameStatus === 'game_over' && gameState.winner && currentUser && !matchRecorded) {
       setMatchRecorded(true);
-      const userPlayer = gameState.players.find((p) => !p.isAi) || gameState.players[0];
+      const userPlayer = isOnlineMatch
+        ? gameState.players.find((p) => p.id === myOnlineMemberId)
+        : gameState.players.find((p) => !p.isAi) || gameState.players[0];
 
       if (userPlayer) {
         const isWinner = gameState.winner.id === userPlayer.id;
@@ -178,24 +341,41 @@ export const App: React.FC = () => {
 
           if (recordRes.newAchievements.length > 0) {
             recordRes.newAchievements.forEach((ach) => {
-              addLog(`🏆 ปลดล็อกเหรียญตรา: "${ach.title}" - ${ach.description}`, 'success');
+              addLog(`🏆 ปปลดล็อกเหรียญตรา: "${ach.title}" - ${ach.description}`, 'success');
             });
           }
         }
       }
     }
-  }, [gameState.gameStatus, gameState.winner, gameState.players, currentUser, matchRecorded]);
+  }, [gameState.gameStatus, gameState.winner, gameState.players, currentUser, matchRecorded, isOnlineMatch, myOnlineMemberId]);
+
+  // -------------------------------------------------------------
+  // DICE ROLL & MOVEMENT
+  // -------------------------------------------------------------
 
   const handleRollDice = () => {
     if (gameState.isDiceRolled || gameState.gameStatus !== 'playing' || movingPlayerId) return;
 
-    audioManager.playDiceRoll();
+    const currentPlayer = gameState.players[gameState.currentTurnPlayerIndex];
+    if (isOnlineMatch && currentPlayer.id !== myOnlineMemberId && !(currentPlayer.isAi && multiplayerService.isHost)) {
+      return;
+    }
+
     const d1 = Math.floor(Math.random() * 6) + 1;
     const d2 = Math.floor(Math.random() * 6) + 1;
+
+    executeDiceRoll(d1, d2, true);
+  };
+
+  const executeDiceRoll = (d1: number, d2: number, broadcast: boolean = true) => {
+    audioManager.playDiceRoll();
     const isDoubles = d1 === d2;
     const totalStep = d1 + d2;
-
     const currentPlayer = gameState.players[gameState.currentTurnPlayerIndex];
+
+    if (isOnlineMatch && broadcast) {
+      multiplayerService.broadcastGameAction('DICE_ROLL', { d1, d2 });
+    }
 
     if (currentPlayer.isBankrupt) {
       nextTurn();
@@ -203,14 +383,14 @@ export const App: React.FC = () => {
     }
 
     if (currentPlayer.isSkipTurn) {
-      addLog(`🏛️ ${currentPlayer.name} ติดภารกิจทำข้อสอบในสนามสอบสนามหลวง (คุก) ข้ามการเล่น 1 ตา`, 'warning');
+      addLog(`🏛️ ${currentPlayer.name} ติดภารกิจทำข้อสอบในสนามสอบสนามหลวง ข้ามการเล่น 1 ตา`, 'warning');
       setGameState((prev) => {
         const updatedPlayers = [...prev.players];
         updatedPlayers[prev.currentTurnPlayerIndex].isSkipTurn = false;
         updatedPlayers[prev.currentTurnPlayerIndex].doublesStreak = 0;
         return { ...prev, players: updatedPlayers };
       });
-      setTimeout(nextTurn, 1000);
+      setTimeout(() => nextTurn(broadcast), 1000);
       return;
     }
 
@@ -218,7 +398,7 @@ export const App: React.FC = () => {
 
     if (currentDoubles >= 3) {
       audioManager.playJailSound();
-      addLog(`🚨 ${currentPlayer.name} ทอยลูกเต๋าออกคู่ 3 ครั้งติดต่อกัน (${d1}-${d2})! ถูกส่งเข้าสนามสอบสนามหลวง (คุก) ทันที และหยุดพัก 1 ตา!`, 'danger');
+      addLog(`🚨 ${currentPlayer.name} ทอยลูกเต๋าออกคู่ 3 ครั้งติดต่อกัน (${d1}-${d2})! ถูกส่งเข้าสนามสอบสนามหลวง ทันที และหยุดพัก 1 ตา!`, 'danger');
       setRolledDoubles(false);
       setGameState((prev) => {
         const updatedPlayers = [...prev.players];
@@ -233,7 +413,7 @@ export const App: React.FC = () => {
           players: updatedPlayers,
         };
       });
-      setTimeout(nextTurn, 1500);
+      setTimeout(() => nextTurn(broadcast), 1500);
       return;
     }
 
@@ -251,7 +431,7 @@ export const App: React.FC = () => {
     });
 
     if (isDoubles) {
-      addLog(`🎲 ${currentPlayer.name} ทอยลูกเต๋าได้ ${d1} + ${d2} = ${totalStep} แต้ม ✨ ลูกเต๋าออกคู่ (${d1}-${d2}) ครั้งที่ ${currentDoubles}/3! ได้สิทธิ์เล่นต่อหลังจากจบรอบนี้`, 'info');
+      addLog(`🎲 ${currentPlayer.name} ทอยลูกเต๋าได้ ${d1} + ${d2} = ${totalStep} แต้ม ✨ ลูกเต๋าออกคู่ (${d1}-${d2}) ครั้งที่ ${currentDoubles}/3! ได้สิทธิ์เล่นต่อ`, 'info');
     } else {
       addLog(`${currentPlayer.name} ทอยลูกเต๋าได้ ${d1} + ${d2} = ${totalStep} แต้ม`, 'info');
     }
@@ -310,6 +490,7 @@ export const App: React.FC = () => {
   const handleLandOnTile = (tileId: number) => {
     const tile = gameState.tiles[tileId];
     const currentPlayer = gameState.players[gameState.currentTurnPlayerIndex];
+    const isMyTurn = !isOnlineMatch || currentPlayer.id === myOnlineMemberId || (currentPlayer.isAi && multiplayerService.isHost);
 
     if (tile.type === 'subject') {
       const owner = gameState.players.find((p) => p.id === tile.ownerId);
@@ -324,15 +505,17 @@ export const App: React.FC = () => {
         } else {
           if (currentPlayer.isAi) {
             if (currentPlayer.wisdomPoints >= (tile.price || 0) + 200) {
-              addLog(`🤖 ${currentPlayer.name} ตัดสินใจตอบคำถามเพื่อซื้อวิชา "${tile.name}" (ราคา ${tile.price} แต้ม)`, 'info');
+              addLog(`🤖 ${currentPlayer.name} ตัดสินใจตอบคำถามเพื่อซื้อวิชา "${tile.name}"`, 'info');
               triggerQuestion(tile, 'buy', `ตอบคำถามบาลีเพื่อซื้อวิชา "${tile.name}" (ราคา ${tile.price} แต้ม)`);
             } else {
               addLog(`🤖 ${currentPlayer.name} เลือกไม่ซื้อวิชา "${tile.name}" เพื่อเก็บแต้มปัญญาไว้`, 'info');
               finishTurnCheck();
             }
           } else {
-            addLog(`📖 ${currentPlayer.name} ตกช่องวิชา "${tile.name}" เลือกว่าจะซื้อวิชาหรือไม่`, 'info');
-            setActiveTileDetail(tile);
+            addLog(`📖 ${currentPlayer.name} ตกช่องวิชา "${tile.name}"`, 'info');
+            if (isMyTurn) {
+              setActiveTileDetail(tile);
+            }
           }
         }
       } else if (owner.id === currentPlayer.id) {
@@ -340,13 +523,15 @@ export const App: React.FC = () => {
         if (currentPlayer.isAi) {
           const canUpgrade = tile.upgradeLevel !== undefined && tile.upgradeLevel < 4 && tile.upgradeCost && currentPlayer.wisdomPoints >= tile.upgradeCost + 200;
           if (canUpgrade) {
-            addLog(`🤖 ${currentPlayer.name} ตัดสินใจตอบคำถามเพื่ออัปเกรดวิชา "${tile.name}" (ราคา ${tile.upgradeCost} แต้ม)`, 'info');
+            addLog(`🤖 ${currentPlayer.name} ตัดสินใจตอบคำถามเพื่ออัปเกรดวิชา "${tile.name}"`, 'info');
             triggerQuestion(tile, 'upgrade', `ตอบคำถามบาลีเพื่ออัปเกรดสำนักเรียน "${tile.name}"`);
           } else {
             finishTurnCheck();
           }
         } else {
-          setActiveTileDetail(tile);
+          if (isMyTurn) {
+            setActiveTileDetail(tile);
+          }
         }
       } else {
         const combo = checkPropertyCombo(gameState.tiles, tile, owner.id);
@@ -367,7 +552,7 @@ export const App: React.FC = () => {
       triggerQuestion(tile, 'exam', 'สนามสอบเปรียญ! ตอบถูกรับโบนัสใหญ่ +300 แต้ม');
     } else if (tile.type === 'goto_jail') {
       audioManager.playJailSound();
-      addLog(`🚨 ${currentPlayer.name} ตกช่อง "${tile.name}"! ถูกส่งตัวไปยังช่อง 10 (สนามสอบสนามหลวง) และติดภารกิจทำข้อสอบหยุดพัก 1 ตา!`, 'danger');
+      addLog(`🚨 ${currentPlayer.name} ตกช่อง "${tile.name}"! ถูกส่งตัวไปยังช่อง 10 และติดภารกิจทำข้อสอบหยุดพัก 1 ตา!`, 'danger');
       setRolledDoubles(false);
       setGameState((prev) => {
         const updatedPlayers = [...prev.players];
@@ -388,14 +573,18 @@ export const App: React.FC = () => {
     }
   };
 
-  const triggerQuestion = (tile: BoardTile, mode: 'buy' | 'rent' | 'quiz' | 'exam' | 'upgrade', title: string) => {
+  const triggerQuestion = (
+    tile: BoardTile,
+    mode: 'buy' | 'rent' | 'quiz' | 'exam' | 'upgrade',
+    title: string,
+    broadcast: boolean = true
+  ) => {
     const categoryQuestions = QUESTION_BANK.filter(
       (q) => !tile.category || q.category === tile.category
     );
     const pool = categoryQuestions.length > 0 ? categoryQuestions : QUESTION_BANK;
 
     let unaskedPool = pool.filter((q) => !gameState.askedQuestionIds.includes(q.id));
-
     if (unaskedPool.length === 0) {
       unaskedPool = pool;
     }
@@ -410,12 +599,29 @@ export const App: React.FC = () => {
         : [...prev.askedQuestionIds, rawQ.id],
     }));
 
-    setActiveQuiz({
-      question: shuffledQ,
-      title,
-      targetTile: tile,
-      mode,
-    });
+    const currentPlayer = gameState.players[gameState.currentTurnPlayerIndex];
+    const isMyTurn = !isOnlineMatch || currentPlayer?.id === myOnlineMemberId || (currentPlayer?.isAi && multiplayerService.isHost);
+
+    if (isOnlineMatch && broadcast) {
+      multiplayerService.broadcastGameAction('QUIZ_OPEN', {
+        question: shuffledQ,
+        title,
+        targetTile: tile,
+        mode,
+        turnPlayerId: currentPlayer.id,
+      });
+    }
+
+    if (isMyTurn) {
+      setActiveQuiz({
+        question: shuffledQ,
+        title,
+        targetTile: tile,
+        mode,
+      });
+    } else {
+      setRemotePlayerNotice(`⏳ ${currentPlayer?.name || 'ผู้เล่น'} กำลังตอบคำถามบาลี: ${title}`);
+    }
   };
 
   const applyCardEffect = (card: CardEffect, player: Player) => {
@@ -436,49 +642,63 @@ export const App: React.FC = () => {
     });
   };
 
-  const handleAnswerQuiz = (isCorrect: boolean, speedBonus: number = 0, timeTaken: number = 0) => {
-    if (!activeQuiz) return;
-    const { question, targetTile, mode } = activeQuiz;
+  const handleAnswerQuiz = (
+    isCorrect: boolean,
+    speedBonus: number = 0,
+    timeTaken: number = 0,
+    broadcast: boolean = true
+  ) => {
+    if (isOnlineMatch && broadcast) {
+      multiplayerService.broadcastGameAction('QUIZ_ANSWER_RESULT', {
+        isCorrect,
+        speedBonus,
+        timeTaken,
+      });
+    }
+
+    const currentQuiz = activeQuiz;
+    setRemotePlayerNotice(null);
 
     setGameState((prev) => {
       const updatedPlayers = [...prev.players];
       const p = updatedPlayers[prev.currentTurnPlayerIndex];
-      p.stats.totalAnswers += 1;
+      if (!p) return prev;
 
+      p.stats.totalAnswers += 1;
       let newReviewItems = prev.reviewItems;
 
       if (isCorrect) {
         p.stats.correctAnswers += 1;
 
-        if (mode === 'buy' && targetTile && targetTile.price && p.wisdomPoints >= targetTile.price) {
-          p.wisdomPoints = p.wisdomPoints - targetTile.price; // Deduct price only, no wisdom bonus
-          p.ownedProperties.push(targetTile.id);
+        if (currentQuiz?.mode === 'buy' && currentQuiz.targetTile && currentQuiz.targetTile.price && p.wisdomPoints >= currentQuiz.targetTile.price) {
+          p.wisdomPoints = p.wisdomPoints - currentQuiz.targetTile.price;
+          p.ownedProperties.push(currentQuiz.targetTile.id);
           p.stats.propertiesBought += 1;
 
           const updatedTiles = prev.tiles.map((t) =>
-            t.id === targetTile.id ? { ...t, ownerId: p.id, upgradeLevel: 0 as const } : t
+            t.id === currentQuiz.targetTile?.id ? { ...t, ownerId: p.id, upgradeLevel: 0 as const } : t
           );
 
           audioManager.playUpgradeSound();
-          addLog(`✨ ${p.name} ตอบคำถามบาลีถูกต้อง! จ่าย ${targetTile.price} แต้มปัญญา และได้รับกรรมสิทธิ์ครอบครองวิชา "${targetTile.name}" สำเร็จ!`, 'success');
+          addLog(`✨ ${p.name} ตอบคำถามบาลีถูกต้อง! ได้รับกรรมสิทธิ์ครอบครองวิชา "${currentQuiz.targetTile.name}" สำเร็จ!`, 'success');
           return { ...prev, players: updatedPlayers, tiles: updatedTiles };
-        } else if (mode === 'upgrade' && targetTile) {
-          const cost = targetTile.upgradeCost || 0;
-          p.wisdomPoints = Math.max(0, p.wisdomPoints - cost); // Deduct upgrade cost only
-          const nextLevel = Math.min(4, ((targetTile.upgradeLevel ?? 0) + 1)) as any;
+        } else if (currentQuiz?.mode === 'upgrade' && currentQuiz.targetTile) {
+          const cost = currentQuiz.targetTile.upgradeCost || 0;
+          p.wisdomPoints = Math.max(0, p.wisdomPoints - cost);
+          const nextLevel = Math.min(4, ((currentQuiz.targetTile.upgradeLevel ?? 0) + 1)) as any;
 
           const updatedTiles = prev.tiles.map((t) =>
-            t.id === targetTile.id ? { ...t, upgradeLevel: nextLevel } : t
+            t.id === currentQuiz.targetTile?.id ? { ...t, upgradeLevel: nextLevel } : t
           );
 
           audioManager.playUpgradeSound();
-          addLog(`✨ ${p.name} ตอบคำถามบาลีถูกต้อง! จ่าย ${cost} แต้มปัญญา และอัปเกรดวิชา "${targetTile.name}" เป็น "${UPGRADE_NAMES[nextLevel]}" สำเร็จ!`, 'success');
+          addLog(`✨ ${p.name} ตอบคำถามบาลีถูกต้อง! อัปเกรดวิชา "${currentQuiz.targetTile.name}" เป็น "${UPGRADE_NAMES[nextLevel]}" สำเร็จ!`, 'success');
           return { ...prev, players: updatedPlayers, tiles: updatedTiles };
-        } else if (mode === 'rent' && targetTile) {
-          const owner = prev.players.find((item) => item.id === targetTile.ownerId);
+        } else if (currentQuiz?.mode === 'rent' && currentQuiz.targetTile) {
+          const owner = prev.players.find((item) => item.id === currentQuiz.targetTile?.ownerId);
           if (owner) {
-            const combo = checkPropertyCombo(prev.tiles, targetTile, owner.id);
-            let baseRent = targetTile.rents ? targetTile.rents[targetTile.upgradeLevel || 0] : 50;
+            const combo = checkPropertyCombo(prev.tiles, currentQuiz.targetTile, owner.id);
+            let baseRent = currentQuiz.targetTile.rents ? currentQuiz.targetTile.rents[currentQuiz.targetTile.upgradeLevel || 0] : 50;
 
             if (combo.hasCombo) {
               baseRent = Math.floor(baseRent * combo.multiplier);
@@ -491,72 +711,82 @@ export const App: React.FC = () => {
 
             addLog(`✨ ${p.name} ตอบคำถามบาลีถูกต้อง! ได้รับส่วนลดจ่ายค่าผ่านทางเพียงครึ่งเดียว (${discountedRent} แต้ม)`, 'info');
           }
-        } else if (mode === 'quiz') {
+        } else if (currentQuiz?.mode === 'quiz') {
           const totalReward = 150 + speedBonus;
           p.wisdomPoints += totalReward;
           audioManager.playSathuChime();
-          if (speedBonus > 0) {
-            addLog(`🏆 ${p.name} ตอบถูกในห้องติวเพิ่มเติม (${timeTaken > 0 ? timeTaken.toFixed(1) + ' วิ' : 'เวลาจำกัด'})! รับโบนัสแต้มปัญญา +${totalReward} แต้ม!`, 'success');
-          } else {
-            addLog(`✨ ${p.name} ตอบถูกในห้องติวเพิ่มเติม! รับโบนัสแต้มปัญญา +${totalReward} แต้ม!`, 'success');
-          }
-        } else if (mode === 'exam') {
+          addLog(`✨ ${p.name} ตอบถูกในห้องติวเพิ่มเติม! รับโบนัสแต้มปัญญา +${totalReward} แต้ม!`, 'success');
+        } else if (currentQuiz?.mode === 'exam') {
           const totalReward = 300 + speedBonus;
           p.wisdomPoints += totalReward;
           p.stats.examsPassed += 1;
           audioManager.playSathuChime();
-          if (speedBonus > 0) {
-            addLog(`🏆 ${p.name} ผ่านสนามสอบเปรียญ (${timeTaken > 0 ? timeTaken.toFixed(1) + ' วิ' : 'เวลาจำกัด'})! รับโบนัสใหญ่ +${totalReward} แต้ม!`, 'success');
-          } else {
-            addLog(`✨ ${p.name} ผ่านสนามสอบเปรียญ! รับโบนัสแต้มปัญญา +${totalReward} แต้ม!`, 'success');
-          }
+          addLog(`✨ ${p.name} ผ่านสนามสอบเปรียญ! รับโบนัสแต้มปัญญา +${totalReward} แต้ม!`, 'success');
         }
       } else {
-        if (mode === 'buy' && targetTile) {
-          addLog(`❌ ${p.name} ตอบคำถามบาลีไม่ถูกต้อง! จึงไม่ได้รับสิทธิ์ครอบครองวิชา "${targetTile.name}" (ไม่เสียแต้มซื้อ)`, 'danger');
-        } else if (mode === 'upgrade' && targetTile) {
-          addLog(`❌ ${p.name} ตอบคำถามบาลีไม่ถูกต้อง! จึงไม่สามารถอัปเกรดวิชา "${targetTile.name}" ได้ (ไม่เสียแต้มอัปเกรด)`, 'danger');
-        } else if (mode === 'rent' && targetTile) {
-          const owner = prev.players.find((item) => item.id === targetTile.ownerId);
+        const penalty = currentQuiz?.mode === 'exam' ? 150 : 100;
+        const isFirstWrongExempt = p.character.firstWrongFree && (p.stats.totalAnswers - p.stats.correctAnswers === 1);
+
+        if (currentQuiz?.mode === 'buy' && currentQuiz.targetTile) {
+          if (isFirstWrongExempt) {
+            addLog(`✨ สกิล [เมตตาธรรม]: ${p.name} ได้รับการยกเว้นการหักแต้มจากการตอบผิดครั้งแรก! (ไม่ได้รับสิทธิ์ซื้อวิชา "${currentQuiz.targetTile.name}")`, 'info');
+          } else {
+            p.wisdomPoints = Math.max(0, p.wisdomPoints - penalty);
+            addLog(`❌ ${p.name} ตอบคำถามบาลีไม่ถูกต้อง! ถูกหักแต้มปัญญา -${penalty} แต้ม และไม่ได้รับสิทธิ์ครอบครองวิชา "${currentQuiz.targetTile.name}"`, 'danger');
+          }
+        } else if (currentQuiz?.mode === 'upgrade' && currentQuiz.targetTile) {
+          if (isFirstWrongExempt) {
+            addLog(`✨ สกิล [เมตตาธรรม]: ${p.name} ได้รับการยกเว้นการหักแต้มจากการตอบผิดครั้งแรก!`, 'info');
+          } else {
+            p.wisdomPoints = Math.max(0, p.wisdomPoints - penalty);
+            addLog(`❌ ${p.name} ตอบคำถามบาลีไม่ถูกต้อง! ถูกหักแต้มปัญญา -${penalty} แต้ม และไม่สามารถอัปเกรดวิชา "${currentQuiz.targetTile.name}" ได้`, 'danger');
+          }
+        } else if (currentQuiz?.mode === 'rent' && currentQuiz.targetTile) {
+          const owner = prev.players.find((item) => item.id === currentQuiz.targetTile?.ownerId);
           if (owner) {
-            const combo = checkPropertyCombo(prev.tiles, targetTile, owner.id);
-            let baseRent = targetTile.rents ? targetTile.rents[targetTile.upgradeLevel || 0] : 50;
+            const combo = checkPropertyCombo(prev.tiles, currentQuiz.targetTile, owner.id);
+            let baseRent = currentQuiz.targetTile.rents ? currentQuiz.targetTile.rents[currentQuiz.targetTile.upgradeLevel || 0] : 50;
 
             if (combo.hasCombo) {
               baseRent = Math.floor(baseRent * combo.multiplier);
-              addLog(`🔥 COMBO x${combo.multiplier}! ${owner.name} ${combo.reasons.join(' และ ')}! ค่าผ่านทางเพิ่มเป็น 2 เท่า (${baseRent} แต้ม)`, 'warning');
             }
 
-            p.wisdomPoints -= baseRent;
+            p.wisdomPoints = Math.max(0, p.wisdomPoints - baseRent);
             owner.wisdomPoints += baseRent;
             addLog(`${p.name} ตอบผิด! จ่ายค่าผ่านทางเต็มจำนวน (${baseRent} แต้ม)`, 'danger');
           }
-        } else if (mode === 'quiz') {
-          addLog(`❌ ${p.name} ตอบคำถามในห้องติวเพิ่มเติมไม่ถูกต้อง`, 'danger');
-        } else if (mode === 'exam') {
-          addLog(`❌ ${p.name} ตอบคำถามในสนามสอบเปรียญไม่ถูกต้อง`, 'danger');
+        } else if (currentQuiz?.mode === 'exam') {
+          if (isFirstWrongExempt) {
+            addLog(`✨ สกิล [เมตตาธรรม]: ${p.name} ได้รับการยกเว้นการหักแต้มจากการตอบผิดครั้งแรกในสนามสอบ!`, 'info');
+          } else {
+            p.wisdomPoints = Math.max(0, p.wisdomPoints - penalty);
+            addLog(`❌ ${p.name} ตอบคำถามในสนามสอบเปรียญไม่ถูกต้อง! ถูกหักแต้มปัญญา -${penalty} แต้ม`, 'danger');
+          }
         } else {
-          addLog(`${p.name} ตอบคำถามบาลีไม่ถูกต้อง หรือหมดเวลา`, 'danger');
+          if (isFirstWrongExempt) {
+            addLog(`✨ สกิล [เมตตาธรรม]: ${p.name} ได้รับการยกเว้นการหักแต้มจากการตอบผิดครั้งแรก!`, 'info');
+          } else {
+            p.wisdomPoints = Math.max(0, p.wisdomPoints - penalty);
+            addLog(`❌ ${p.name} ตอบคำถามบาลีไม่ถูกต้อง หรือหมดเวลา! ถูกหักแต้มปัญญา -${penalty} แต้ม`, 'danger');
+          }
         }
 
-        // Global 3 Wrong Answers Rule -> Send to Tile 20 (สนามติวเข้มพิเศษ)
         p.tutoringWrongCount = (p.tutoringWrongCount || 0) + 1;
         if (p.tutoringWrongCount >= 3) {
-          p.position = 20; // Teleport to Tile 20: สนามติวเข้มพิเศษ (ห้องกักตัว)
-          p.isSkipTurn = true; // Skip 1 turn
+          p.position = 20;
+          p.isSkipTurn = true;
           p.tutoringWrongCount = 0;
           p.doublesStreak = 0;
           setRolledDoubles(false);
           audioManager.playJailSound();
-          addLog(`🚨 ${p.name} ตอบคำถามผิดสะสมครบ 3 ข้อจากที่ต่างๆ! ถูกส่งตัวเข้า "สนามติวเข้มพิเศษ (ช่อง 20)" เพื่อกักตัวติวเข้ม และหยุดเดิน 1 ตา!`, 'danger');
-        } else {
-          addLog(`⚠️ ${p.name} ตอบผิดสะสม ${p.tutoringWrongCount}/3 ข้อ (หากผิดครบ 3 ข้อ จะถูกส่งเข้าสนามติวเข้มพิเศษ ช่อง 20 และหยุดเดิน 1 ตา)`, 'warning');
+          addLog(`🚨 ${p.name} ตอบคำถามผิดสะสมครบ 3 ข้อ! ถูกส่งตัวเข้า "สนามติวเข้มพิเศษ" และหยุดเดิน 1 ตา!`, 'danger');
         }
 
-        newReviewItems = addWrongQuestionToSRS(prev.reviewItems, question);
-
-        if (currentUser) {
-          syncUserReviewDeck(currentUser.id, newReviewItems);
+        if (currentQuiz?.question) {
+          newReviewItems = addWrongQuestionToSRS(prev.reviewItems, currentQuiz.question);
+          if (currentUser) {
+            syncUserReviewDeck(currentUser.id, newReviewItems);
+          }
         }
       }
 
@@ -564,8 +794,6 @@ export const App: React.FC = () => {
         if (p.ownedProperties.length === 0) {
           p.isBankrupt = true;
           addLog(`💥 ${p.name} แต้มปัญญาหมดและไม่มีวิชาเหลือ! ล้มละลายออกจากการแข่งขัน`, 'danger');
-        } else {
-          addLog(`⚠️ ${p.name} แต้มปัญญาเหลือน้อยกว่า 0 สามารถขายวิชาคืนให้สำนักเรียนได้`, 'warning');
         }
       }
 
@@ -638,15 +866,20 @@ export const App: React.FC = () => {
       audioManager.playSathuChime();
       setGameState((prev) => ({ ...prev, isDiceRolled: false }));
     } else {
-      setTimeout(nextTurn, currentPlayer.isAi ? 1000 : 800);
+      setTimeout(() => nextTurn(true), currentPlayer.isAi ? 1000 : 800);
     }
   };
 
-  const nextTurn = () => {
+  const nextTurn = (broadcast: boolean = true) => {
     setActiveQuiz(null);
     setActiveTileDetail(null);
     setActiveEventCard(null);
     setRolledDoubles(false);
+    setRemotePlayerNotice(null);
+
+    if (isOnlineMatch && broadcast && multiplayerService.isHost) {
+      multiplayerService.broadcastGameAction('TURN_CHANGE', {});
+    }
 
     setGameState((prev) => {
       let activePlayers = prev.players.filter((p) => !p.isBankrupt);
@@ -658,7 +891,6 @@ export const App: React.FC = () => {
         };
       }
 
-      // Reset the current player's doubles streak when passing turn
       const updatedPlayers = prev.players.map((p, idx) =>
         idx === prev.currentTurnPlayerIndex ? { ...p, doublesStreak: 0 } : p
       );
@@ -699,16 +931,21 @@ export const App: React.FC = () => {
     if (gameState.gameStatus !== 'playing') return;
     const currentPlayer = gameState.players[gameState.currentTurnPlayerIndex];
 
+    // In online matches, only host runs AI logic
+    if (isOnlineMatch && !multiplayerService.isHost) return;
+
     if (currentPlayer && currentPlayer.isAi && !currentPlayer.isBankrupt && !gameState.isDiceRolled && !movingPlayerId && !activeQuiz && !activeEventCard && !activeTileDetail) {
       const timer = setTimeout(() => {
         handleRollDice();
       }, 1000);
       return () => clearTimeout(timer);
     }
-  }, [gameState.currentTurnPlayerIndex, gameState.isDiceRolled, gameState.gameStatus, movingPlayerId, activeQuiz, activeEventCard, activeTileDetail]);
+  }, [gameState.currentTurnPlayerIndex, gameState.isDiceRolled, gameState.gameStatus, movingPlayerId, activeQuiz, activeEventCard, activeTileDetail, isOnlineMatch]);
 
   useEffect(() => {
     if (activeQuiz && gameState.players[gameState.currentTurnPlayerIndex]?.isAi) {
+      if (isOnlineMatch && !multiplayerService.isHost) return;
+
       const randomSeconds = +(Math.random() * 4 + 2.5).toFixed(1);
       const isCorrect = Math.random() < 0.75;
       const speedBonus = isCorrect ? Math.max(10, Math.round((15 - randomSeconds) * 10)) : 0;
@@ -718,57 +955,114 @@ export const App: React.FC = () => {
       }, 1200);
       return () => clearTimeout(timer);
     }
-  }, [activeQuiz]);
+  }, [activeQuiz, isOnlineMatch]);
 
   useEffect(() => {
     if (activeEventCard && activeEventCard.player.isAi) {
+      if (isOnlineMatch && !multiplayerService.isHost) return;
+
       const timer = setTimeout(() => {
         setActiveEventCard(null);
         finishTurnCheck();
       }, 1500);
       return () => clearTimeout(timer);
     }
-  }, [activeEventCard]);
-
-  useEffect(() => {
-    if (activeTileDetail && gameState.players[gameState.currentTurnPlayerIndex]?.isAi) {
-      const timer = setTimeout(() => {
-        const currentPlayer = gameState.players[gameState.currentTurnPlayerIndex];
-        if (
-          activeTileDetail.ownerId === currentPlayer.id &&
-          activeTileDetail.upgradeLevel !== undefined &&
-          activeTileDetail.upgradeLevel < 4 &&
-          activeTileDetail.upgradeCost &&
-          currentPlayer.wisdomPoints >= activeTileDetail.upgradeCost
-        ) {
-          const tile = activeTileDetail;
-          setGameState((prev) => {
-            const updatedTiles = prev.tiles.map((t) =>
-              t.id === tile.id ? { ...t, upgradeLevel: Math.min(4, (t.upgradeLevel || 0) + 1) as any } : t
-            );
-            const updatedPlayers = [...prev.players];
-            const p = updatedPlayers[prev.currentTurnPlayerIndex];
-            if (tile.upgradeCost) p.wisdomPoints -= tile.upgradeCost;
-            addLog(`${p.name} อัปเกรดวิชา "${tile.name}" สำเร็จ!`, 'success');
-            return { ...prev, tiles: updatedTiles, players: updatedPlayers };
-          });
-        }
-        setActiveTileDetail(null);
-        finishTurnCheck();
-      }, 1200);
-      return () => clearTimeout(timer);
-    }
-  }, [activeTileDetail]);
+  }, [activeEventCard, isOnlineMatch]);
 
   const currentPlayer = gameState.players[gameState.currentTurnPlayerIndex];
+  const isMyTurn = !isOnlineMatch || currentPlayer?.id === myOnlineMemberId || (currentPlayer?.isAi && multiplayerService.isHost);
+  const friendReqCount = currentUser?.incomingFriendRequests?.length || 0;
 
   return (
     <div className="game-app-container">
+      {/* Top Floating Game Invite Banner */}
+      {activeInviteBanner && (
+        <div
+          style={{
+            position: 'fixed',
+            top: '16px',
+            right: '20px',
+            zIndex: 1300,
+            animation: 'fadeIn 0.3s ease',
+            maxWidth: '380px',
+            width: '92%',
+          }}
+        >
+          <div
+            className="glass-panel"
+            style={{
+              padding: '12px 16px',
+              border: '1.5px solid var(--primary-gold)',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.8), 0 0 20px var(--gold-glow)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontSize: '1.3rem' }}>{activeInviteBanner.fromAvatar}</span>
+                <div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--primary-gold)' }}>
+                    {activeInviteBanner.fromDisplayName}
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                    ชวนท่านเข้าร่วมห้องแข่งขัน: <strong style={{ color: '#fff' }}>{activeInviteBanner.roomCode}</strong>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  clearInvite(activeInviteBanner.id);
+                  setActiveInviteBanner(null);
+                }}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+              <button
+                onClick={() => {
+                  setInitialRoomCode(activeInviteBanner.roomCode);
+                  clearInvite(activeInviteBanner.id);
+                  setActiveInviteBanner(null);
+                  setShowOnlineLobbyModal(true);
+                }}
+                className="gold-button"
+                style={{ flex: 1, padding: '6px 12px', fontSize: '0.78rem', justifyContent: 'center', borderRadius: '8px' }}
+              >
+                <Check size={14} /> เข้าร่วมห้อง
+              </button>
+              <button
+                onClick={() => {
+                  clearInvite(activeInviteBanner.id);
+                  setActiveInviteBanner(null);
+                }}
+                className="secondary-button"
+                style={{ padding: '6px 12px', fontSize: '0.78rem', borderRadius: '8px' }}
+              >
+                ปิด
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Header */}
       <GameHeader
         gameState={gameState}
         currentUser={currentUser}
         onOpenNotebook={() => setShowReviewNotebook(true)}
-        onRestart={() => setGameState((prev) => ({ ...prev, gameStatus: 'setup' }))}
+        onRestart={() => {
+          if (isOnlineMatch) {
+            multiplayerService.leaveRoom();
+            setIsOnlineMatch(false);
+          }
+          setGameState((prev) => ({ ...prev, gameStatus: 'setup' }));
+        }}
         onToggleMute={() => setIsMuted(audioManager.toggleMute())}
         isMuted={isMuted}
         onOpenAuthModal={() => {
@@ -777,13 +1071,49 @@ export const App: React.FC = () => {
         }}
         onOpenProfileModal={() => setShowProfileModal(true)}
         onOpenLeaderboard={() => setShowLeaderboardModal(true)}
+        onOpenFriends={() => setShowFriendsModal(true)}
+        onOpenOnlineLobby={() => setShowOnlineLobbyModal(true)}
+        isOnline={isOnlineMatch}
+        onlineRoomCode={onlineRoomSettings?.roomCode}
+        friendRequestCount={friendReqCount}
       />
+
+      {/* Remote Turn Notice Overlay Banner */}
+      {remotePlayerNotice && gameState.gameStatus === 'playing' && (
+        <div
+          style={{
+            margin: '0 auto 12px auto',
+            maxWidth: '600px',
+            padding: '10px 16px',
+            background: 'linear-gradient(135deg, rgba(2, 132, 199, 0.25), rgba(212, 175, 55, 0.2))',
+            border: '1.5px solid #38bdf8',
+            borderRadius: '12px',
+            boxShadow: '0 4px 15px rgba(2, 132, 199, 0.3)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '10px',
+            fontSize: '0.88rem',
+            color: '#fff',
+            fontWeight: 600,
+            animation: 'fadeIn 0.25s ease',
+          }}
+        >
+          <Sparkles size={18} color="#38bdf8" />
+          <span>{remotePlayerNotice}</span>
+        </div>
+      )}
 
       {gameState.gameStatus === 'playing' && (
         <div className="game-layout">
           <div className="players-sidebar">
-            <h3 style={{ fontSize: '0.9rem', color: 'var(--primary-gold)', margin: '0 0 4px 0' }}>
-              👥 ผู้เข้าแข่งขัน (Players)
+            <h3 style={{ fontSize: '0.9rem', color: 'var(--primary-gold)', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span>👥 ผู้เข้าแข่งขัน (Players)</span>
+              {isOnlineMatch && (
+                <span style={{ fontSize: '0.7rem', color: '#38bdf8', fontWeight: 600 }}>
+                  🌐 ออนไลน์
+                </span>
+              )}
             </h3>
             {gameState.players.map((p, idx) => (
               <PlayerCard
@@ -800,11 +1130,16 @@ export const App: React.FC = () => {
               players={gameState.players}
               currentTurnPlayer={currentPlayer}
               movingPlayerId={movingPlayerId}
-              onTileClick={(tile) => setActiveTileDetail(tile)}
+              onTileClick={(tile) => {
+                if (!isOnlineMatch || isMyTurn) {
+                  setActiveTileDetail(tile);
+                }
+              }}
               onRollDice={handleRollDice}
               isDiceRolled={gameState.isDiceRolled}
               dice={gameState.dice}
               logs={gameState.logs}
+              canRollDice={isMyTurn}
             />
           </div>
 
@@ -817,6 +1152,12 @@ export const App: React.FC = () => {
               <div>คำถามในคลัง: {QUESTION_BANK.length} ข้อ</div>
               <div>คำถามทบทวนสะสม: {gameState.reviewItems.length} ข้อ</div>
               <div>คำถามที่ถามแล้ว: {gameState.askedQuestionIds.length} / {QUESTION_BANK.length} ข้อ</div>
+              {isOnlineMatch && onlineRoomSettings && (
+                <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(56,189,248,0.3)' }}>
+                  <div style={{ color: '#38bdf8', fontWeight: 700 }}>🌐 ห้อง: {onlineRoomSettings.roomCode}</div>
+                  <div style={{ color: 'var(--text-muted)' }}>โหมด: {onlineRoomSettings.mode} ({onlineRoomSettings.maxRounds} รอบ)</div>
+                </div>
+              )}
               {currentUser && (
                 <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(212,175,55,0.2)' }}>
                   <div style={{ color: 'var(--primary-gold)', fontWeight: 600 }}>🌟 บัญชี: {currentUser.displayName}</div>
@@ -837,6 +1178,8 @@ export const App: React.FC = () => {
             setShowAuthModal(true);
           }}
           onOpenLeaderboard={() => setShowLeaderboardModal(true)}
+          onOpenOnlineLobby={() => setShowOnlineLobbyModal(true)}
+          onOpenFriends={() => setShowFriendsModal(true)}
         />
       )}
 
@@ -846,9 +1189,9 @@ export const App: React.FC = () => {
           player={currentPlayer}
           title={activeQuiz.title}
           mode={activeQuiz.mode}
-          onAnswer={handleAnswerQuiz}
+          onAnswer={(isCorrect, speedBonus, timeTaken) => handleAnswerQuiz(isCorrect, speedBonus, timeTaken, true)}
           canUseFreeCard={currentPlayer.freeAnswerCards > 0}
-          onUseFreeCard={() => handleAnswerQuiz(true, 150, 0.5)}
+          onUseFreeCard={() => handleAnswerQuiz(true, 150, 0.5, true)}
         />
       )}
 
@@ -913,9 +1256,56 @@ export const App: React.FC = () => {
         <WinnerModal
           winner={gameState.winner}
           players={gameState.players}
-          onRestart={() => setGameState((prev) => ({ ...prev, gameStatus: 'setup' }))}
+          onRestart={() => {
+            if (isOnlineMatch) {
+              multiplayerService.leaveRoom();
+              setIsOnlineMatch(false);
+            }
+            setGameState((prev) => ({ ...prev, gameStatus: 'setup' }));
+          }}
         />
       )}
+
+      {/* Friends Modal */}
+      <FriendsModal
+        isOpen={showFriendsModal}
+        onClose={() => setShowFriendsModal(false)}
+        currentUser={currentUser}
+        onOpenAuthModal={() => {
+          setShowFriendsModal(false);
+          setAuthModalTab('login');
+          setShowAuthModal(true);
+        }}
+        currentRoomCode={onlineRoomSettings?.roomCode}
+        onOpenCreateRoom={() => {
+          setShowFriendsModal(false);
+          setShowOnlineLobbyModal(true);
+        }}
+      />
+
+      {/* Online Lobby Modal */}
+      <OnlineLobbyModal
+        isOpen={showOnlineLobbyModal}
+        onClose={() => setShowOnlineLobbyModal(false)}
+        currentUser={currentUser}
+        onOpenAuthModal={() => {
+          setShowOnlineLobbyModal(false);
+          setAuthModalTab('login');
+          setShowAuthModal(true);
+        }}
+        onStartOnlineGame={handleStartOnlineGame}
+        initialRoomCode={initialRoomCode}
+        onOpenFriends={() => {
+          setShowOnlineLobbyModal(false);
+          setShowFriendsModal(true);
+        }}
+      />
+
+      {/* In-Game Live Online Chat Drawer */}
+      <InGameOnlineChat
+        isOnline={isOnlineMatch}
+        currentRoomCode={onlineRoomSettings?.roomCode}
+      />
 
       {/* Authentication Modal */}
       <AuthModal
@@ -950,6 +1340,10 @@ export const App: React.FC = () => {
           onOpenLeaderboard={() => {
             setShowProfileModal(false);
             setShowLeaderboardModal(true);
+          }}
+          onOpenFriends={() => {
+            setShowProfileModal(false);
+            setShowFriendsModal(true);
           }}
         />
       )}
