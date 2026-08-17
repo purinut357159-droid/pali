@@ -28,6 +28,7 @@ import {
   getCurrentUser,
   recordMatchResult,
   syncUserReviewDeck,
+  liveRecordStatChange,
 } from './utils/authService';
 import { checkPropertyCombo, UPGRADE_NAMES } from './utils/comboEngine';
 import { multiplayerService } from './utils/multiplayerService';
@@ -723,6 +724,18 @@ export const App: React.FC = () => {
       if (isCorrect) {
         p.stats.correctAnswers += 1;
 
+        if (currentUser && (!isOnlineMatch || p.id === myOnlineMemberId)) {
+          if (currentQuiz?.mode === 'buy') {
+            liveRecordStatChange(currentUser.id, { correctDelta: 1, totalAnswersDelta: 1, propertyBoughtDelta: 1 });
+          } else if (currentQuiz?.mode === 'exam') {
+            liveRecordStatChange(currentUser.id, { correctDelta: 1, totalAnswersDelta: 1, examDelta: 1, wisdomGained: 300 + speedBonus });
+          } else if (currentQuiz?.mode === 'quiz') {
+            liveRecordStatChange(currentUser.id, { correctDelta: 1, totalAnswersDelta: 1, wisdomGained: 150 + speedBonus });
+          } else {
+            liveRecordStatChange(currentUser.id, { correctDelta: 1, totalAnswersDelta: 1 });
+          }
+        }
+
         if (currentQuiz?.mode === 'buy' && currentQuiz.targetTile && currentQuiz.targetTile.price && p.wisdomPoints >= currentQuiz.targetTile.price) {
           p.wisdomPoints = p.wisdomPoints - currentQuiz.targetTile.price;
           p.ownedProperties.push(currentQuiz.targetTile.id);
@@ -777,6 +790,9 @@ export const App: React.FC = () => {
           addLog(`✨ ${p.name} ผ่านสนามสอบเปรียญ! รับโบนัสแต้มปัญญา +${totalReward} แต้ม!`, 'success');
         }
       } else {
+        if (currentUser && (!isOnlineMatch || p.id === myOnlineMemberId)) {
+          liveRecordStatChange(currentUser.id, { totalAnswersDelta: 1 });
+        }
         const penalty = currentQuiz?.mode === 'exam' ? 150 : 100;
         const isFirstWrongExempt = p.character.firstWrongFree && (p.stats.totalAnswers - p.stats.correctAnswers === 1);
 

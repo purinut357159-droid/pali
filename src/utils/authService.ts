@@ -687,6 +687,75 @@ export function recordMatchResult(
   };
 }
 
+export function liveRecordStatChange(
+  userId: string,
+  statDelta: {
+    wisdomGained?: number;
+    correctDelta?: number;
+    totalAnswersDelta?: number;
+    propertyBoughtDelta?: number;
+    examDelta?: number;
+  }
+): UserAccount | null {
+  const accounts = getStoredAccounts();
+  const userIndex = accounts.findIndex((acc) => acc.id === userId);
+  if (userIndex < 0) return null;
+
+  const user = accounts[userIndex];
+  if (!user.stats) {
+    user.stats = {
+      gamesPlayed: 0,
+      gamesWon: 0,
+      currentWinStreak: 0,
+      maxWinStreak: 0,
+      correctAnswers: 0,
+      totalAnswers: 0,
+      propertiesBought: 0,
+      examsPassed: 0,
+      totalWisdomEarned: 0,
+    };
+  }
+
+  if (statDelta.wisdomGained) {
+    user.stats.totalWisdomEarned = Math.max(0, user.stats.totalWisdomEarned + statDelta.wisdomGained);
+    user.exp += Math.max(5, Math.floor(statDelta.wisdomGained / 10));
+  }
+  if (statDelta.correctDelta) {
+    user.stats.correctAnswers += statDelta.correctDelta;
+    user.exp += statDelta.correctDelta * 15;
+  }
+  if (statDelta.totalAnswersDelta) {
+    user.stats.totalAnswers += statDelta.totalAnswersDelta;
+  }
+  if (statDelta.propertyBoughtDelta) {
+    user.stats.propertiesBought += statDelta.propertyBoughtDelta;
+    user.exp += statDelta.propertyBoughtDelta * 20;
+  }
+  if (statDelta.examDelta) {
+    user.stats.examsPassed += statDelta.examDelta;
+    user.exp += statDelta.examDelta * 30;
+  }
+
+  // Update level in real-time
+  const newLevel = Math.floor(user.exp / 150) + 1;
+  if (newLevel > user.level) {
+    user.level = newLevel;
+    user.rankTitle = getRankTitle(user.level).title;
+  }
+
+  accounts[userIndex] = user;
+  saveStoredAccounts(accounts, true);
+
+  const currentSession = getCurrentSession();
+  if (currentSession && currentSession.userId === userId) {
+    currentSession.level = user.level;
+    currentSession.rankTitle = user.rankTitle;
+    setStoredSession(currentSession, currentSession.rememberMe);
+  }
+
+  return user;
+}
+
 export function getLeaderboardAccounts(
   sortBy: 'streak' | 'wins' | 'level' | 'wisdom' = 'streak'
 ): UserAccount[] {

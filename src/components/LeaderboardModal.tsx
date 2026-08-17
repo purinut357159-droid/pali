@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Trophy,
   Flame,
@@ -10,6 +10,8 @@ import {
   Check,
   Globe,
   Coins,
+  RefreshCw,
+  Radio,
 } from 'lucide-react';
 import type { UserAccount } from '../types/auth';
 import { getLeaderboardAccounts } from '../utils/authService';
@@ -37,27 +39,41 @@ export const LeaderboardModal: React.FC<Props> = ({
   const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' } | null>(null);
   const [friendIds, setFriendIds] = useState<string[]>([]);
   const [sentReqIds, setSentReqIds] = useState<string[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [lastSyncTime, setLastSyncTime] = useState<string>('เมื่อสักครู่');
+  const pollIntervalRef = useRef<number | null>(null);
 
-  const loadAccounts = () => {
+  const loadAccounts = (silent: boolean = false) => {
+    if (!silent) setIsRefreshing(true);
     const list = getLeaderboardAccounts(sortTab);
     setAccounts(list);
+    setLastSyncTime(new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
     if (currentUser) {
       const friends = getFriends(currentUser.id);
       setFriendIds(friends.map((f) => f.id));
       setSentReqIds((currentUser.outgoingFriendRequests || []).map((r) => r.toUserId));
     }
+    if (!silent) {
+      setTimeout(() => setIsRefreshing(false), 400);
+    }
   };
 
   useEffect(() => {
     if (!isOpen) return;
-    loadAccounts();
+    loadAccounts(true);
 
     const handleAccountsUpdate = () => {
-      loadAccounts();
+      loadAccounts(true);
     };
+
+    // Live auto-polling every 1.5 seconds for real-time ranking updates
+    pollIntervalRef.current = window.setInterval(() => {
+      loadAccounts(true);
+    }, 1500);
 
     window.addEventListener('pali_accounts_updated', handleAccountsUpdate);
     return () => {
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
       window.removeEventListener('pali_accounts_updated', handleAccountsUpdate);
     };
   }, [isOpen, sortTab, currentUser]);
@@ -166,18 +182,58 @@ export const LeaderboardModal: React.FC<Props> = ({
         </button>
 
         {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: '18px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
             <Globe size={26} color="#38bdf8" />
             <Trophy size={30} color="var(--primary-gold)" />
             <h2 className="gold-gradient-text" style={{ fontSize: '1.5rem', margin: 0 }}>
-              ทำเนียบมหาเปรียญออนไลน์ (Online Leaderboard)
+              ทำเนียบมหาเปรียญออนไลน์ (Live Leaderboard)
             </h2>
             <Flame size={28} color="#ef4444" />
           </div>
-          <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-            จัดอันดับสถิติสดของผู้เล่นและนักศึกษาบาลีทั่วประเทศ (ซิงค์บัญชีออนไลน์อัตโนมัติ)
-          </p>
+
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginTop: '6px', flexWrap: 'wrap' }}>
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                background: 'rgba(34, 197, 94, 0.15)',
+                border: '1px solid rgba(34, 197, 94, 0.4)',
+                borderRadius: '20px',
+                padding: '3px 10px',
+                fontSize: '0.72rem',
+                color: '#4ade80',
+                fontWeight: 700,
+              }}
+            >
+              <Radio size={12} className="pulse-active" color="#22c55e" />
+              <span>🔴 LIVE REAL-TIME • อัปเดตสดอัตโนมัติ</span>
+            </div>
+
+            <button
+              onClick={() => {
+                loadAccounts(false);
+                audioManager.playDiceRoll();
+              }}
+              style={{
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
+                borderRadius: '20px',
+                padding: '3px 10px',
+                color: 'var(--text-muted)',
+                fontSize: '0.72rem',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+              }}
+              title="ซิงค์ข้อมูลอันดับใหม่ทันที"
+            >
+              <RefreshCw size={11} className={isRefreshing ? 'spin-anim' : ''} />
+              <span>ซิงค์สด ({lastSyncTime})</span>
+            </button>
+          </div>
         </div>
 
         {/* Tab Selection */}
