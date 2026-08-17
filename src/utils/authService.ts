@@ -4,6 +4,17 @@ import type { ReviewItem, CharacterId } from '../types/game';
 
 const STORAGE_KEY_ACCOUNTS = 'pali_accounts_v2';
 const STORAGE_KEY_SESSION = 'pali_session_v2';
+const STORAGE_KEY_PUBLIC_REGISTRY = 'pali_public_accounts_registry_v2';
+
+const accountsChannel = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('pali_accounts_sync_channel_v2') : null;
+
+if (accountsChannel) {
+  accountsChannel.onmessage = (event) => {
+    if (event.data?.type === 'ACCOUNTS_SYNC' && Array.isArray(event.data.accounts)) {
+      syncExternalAccounts(event.data.accounts, false);
+    }
+  };
+}
 
 function hashPassword(password: string): string {
   try {
@@ -139,12 +150,49 @@ const INITIAL_DEMO_ACCOUNTS: UserAccount[] = [
 
 export function getStoredAccounts(): UserAccount[] {
   try {
+    let accounts: UserAccount[] = [];
     const raw = localStorage.getItem(STORAGE_KEY_ACCOUNTS);
     if (!raw) {
+      accounts = INITIAL_DEMO_ACCOUNTS;
       localStorage.setItem(STORAGE_KEY_ACCOUNTS, JSON.stringify(INITIAL_DEMO_ACCOUNTS));
-      return INITIAL_DEMO_ACCOUNTS;
+    } else {
+      accounts = JSON.parse(raw);
     }
-    const accounts: UserAccount[] = JSON.parse(raw);
+
+    // Merge with Public Accounts Registry so newly registered IDs from other sessions/peers are preserved
+    const publicRaw = localStorage.getItem(STORAGE_KEY_PUBLIC_REGISTRY);
+    if (publicRaw) {
+      try {
+        const publicAccounts: UserAccount[] = JSON.parse(publicRaw);
+        publicAccounts.forEach((pubAcc) => {
+          const localIdx = accounts.findIndex((a) => a.id === pubAcc.id || a.username.toLowerCase() === pubAcc.username.toLowerCase());
+          if (localIdx < 0) {
+            accounts.push(pubAcc);
+          } else {
+            // Update stats/level if public has higher stats
+            const localAcc = accounts[localIdx];
+            if ((pubAcc.level || 1) > (localAcc.level || 1) || (pubAcc.stats?.gamesWon || 0) > (localAcc.stats?.gamesWon || 0)) {
+              accounts[localIdx] = {
+                ...localAcc,
+                level: Math.max(localAcc.level, pubAcc.level || 1),
+                exp: Math.max(localAcc.exp, pubAcc.exp || 0),
+                rankTitle: pubAcc.rankTitle || localAcc.rankTitle,
+                stats: {
+                  ...localAcc.stats,
+                  gamesPlayed: Math.max(localAcc.stats.gamesPlayed, pubAcc.stats?.gamesPlayed || 0),
+                  gamesWon: Math.max(localAcc.stats.gamesWon, pubAcc.stats?.gamesWon || 0),
+                  maxWinStreak: Math.max(localAcc.stats.maxWinStreak, pubAcc.stats?.maxWinStreak || 0),
+                  currentWinStreak: pubAcc.stats?.currentWinStreak ?? localAcc.stats.currentWinStreak,
+                  correctAnswers: Math.max(localAcc.stats.correctAnswers, pubAcc.stats?.correctAnswers || 0),
+                  totalAnswers: Math.max(localAcc.stats.totalAnswers, pubAcc.stats?.totalAnswers || 0),
+                  totalWisdomEarned: Math.max(localAcc.stats.totalWisdomEarned, pubAcc.stats?.totalWisdomEarned || 0),
+                },
+              };
+            }
+          }
+        });
+      } catch {}
+    }
     
     // Guarantee Developer Account always exists
     const hasDev = accounts.some((a) => a.id === DEVELOPER_ACCOUNT.id || a.username.toLowerCase() === 'developer');
@@ -152,7 +200,6 @@ export function getStoredAccounts(): UserAccount[] {
       accounts.unshift(DEVELOPER_ACCOUNT);
       localStorage.setItem(STORAGE_KEY_ACCOUNTS, JSON.stringify(accounts));
     } else {
-      // Ensure role/isDeveloper is set
       const devAcc = accounts.find((a) => a.id === DEVELOPER_ACCOUNT.id || a.username.toLowerCase() === 'developer');
       if (devAcc) {
         devAcc.isDeveloper = true;
@@ -177,11 +224,75 @@ export function getStoredAccounts(): UserAccount[] {
   }
 }
 
-export function saveStoredAccounts(accounts: UserAccount[]): void {
+export function saveStoredAccounts(accounts: UserAccount[], broadcast: boolean = true): void {
   try {
     localStorage.setItem(STORAGE_KEY_ACCOUNTS, JSON.stringify(accounts));
+    localStorage.setItem(STORAGE_KEY_PUBLIC_REGISTRY, JSON.stringify(accounts));
+
+    if (broadcast && accountsChannel) {
+      accountsChannel.postMessage({ type: 'ACCOUNTS_SYNC', accounts });
+    }
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('pali_accounts_updated'));
+    }
   } catch (e) {
     console.error('Failed to save accounts to storage', e);
+  }
+}
+
+export function syncExternalAccounts(incomingAccounts: UserAccount[], broadcast: boolean = true): void {
+  if (!Array.isArray(incomingAccounts) || incomingAccounts.length === 0) return;
+
+  const current = getStoredAccounts();
+  let changed = false;
+
+  incomingAccounts.forEach((inc) => {
+    const existingIndex = current.findIndex(
+      (a) => a.id === inc.id || a.username.toLowerCase() === inc.username.toLowerCase()
+    );
+
+    if (existingIndex < 0) {
+      current.push({
+        ...inc,
+        friendIds: inc.friendIds || [],
+        incomingFriendRequests: inc.incomingFriendRequests || [],
+        outgoingFriendRequests: inc.outgoingFriendRequests || [],
+      });
+      changed = true;
+    } else {
+      const existing = current[existingIndex];
+      const hasUpdates =
+        (inc.level || 1) > (existing.level || 1) ||
+        (inc.stats?.gamesWon || 0) > (existing.stats?.gamesWon || 0) ||
+        (inc.stats?.maxWinStreak || 0) > (existing.stats?.maxWinStreak || 0);
+
+      if (hasUpdates) {
+        current[existingIndex] = {
+          ...existing,
+          displayName: inc.displayName || existing.displayName,
+          avatar: inc.avatar || existing.avatar,
+          level: Math.max(existing.level, inc.level || 1),
+          exp: Math.max(existing.exp, inc.exp || 0),
+          rankTitle: inc.rankTitle || existing.rankTitle,
+          stats: {
+            ...existing.stats,
+            gamesPlayed: Math.max(existing.stats.gamesPlayed, inc.stats?.gamesPlayed || 0),
+            gamesWon: Math.max(existing.stats.gamesWon, inc.stats?.gamesWon || 0),
+            maxWinStreak: Math.max(existing.stats.maxWinStreak, inc.stats?.maxWinStreak || 0),
+            currentWinStreak: inc.stats?.currentWinStreak ?? existing.stats.currentWinStreak,
+            correctAnswers: Math.max(existing.stats.correctAnswers, inc.stats?.correctAnswers || 0),
+            totalAnswers: Math.max(existing.stats.totalAnswers, inc.stats?.totalAnswers || 0),
+            totalWisdomEarned: Math.max(existing.stats.totalWisdomEarned, inc.stats?.totalWisdomEarned || 0),
+          },
+        };
+        changed = true;
+      }
+    }
+  });
+
+  if (changed) {
+    saveStoredAccounts(current, broadcast);
   }
 }
 

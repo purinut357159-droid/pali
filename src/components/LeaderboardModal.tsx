@@ -1,26 +1,105 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Trophy,
   Flame,
   X,
   Sparkles,
   Search,
+  UserPlus,
+  Gamepad2,
+  Check,
+  Globe,
+  Coins,
 } from 'lucide-react';
+import type { UserAccount } from '../types/auth';
 import { getLeaderboardAccounts } from '../utils/authService';
+import { sendFriendRequest, sendGameInvite, getFriends } from '../utils/friendService';
+import { audioManager } from '../utils/audioManager';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  currentUserId?: string | null;
+  currentUser?: UserAccount | null;
+  currentRoomCode?: string | null;
+  onOpenCreateRoom?: () => void;
 }
 
-export const LeaderboardModal: React.FC<Props> = ({ isOpen, onClose, currentUserId }) => {
-  const [sortTab, setSortTab] = useState<'streak' | 'wins' | 'level'>('streak');
+export const LeaderboardModal: React.FC<Props> = ({
+  isOpen,
+  onClose,
+  currentUser,
+  currentRoomCode,
+  onOpenCreateRoom,
+}) => {
+  const [sortTab, setSortTab] = useState<'streak' | 'wins' | 'level' | 'wisdom'>('streak');
   const [searchTerm, setSearchTerm] = useState('');
+  const [accounts, setAccounts] = useState<UserAccount[]>([]);
+  const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'info' } | null>(null);
+  const [friendIds, setFriendIds] = useState<string[]>([]);
+  const [sentReqIds, setSentReqIds] = useState<string[]>([]);
+
+  const loadAccounts = () => {
+    const list = getLeaderboardAccounts(sortTab);
+    setAccounts(list);
+    if (currentUser) {
+      const friends = getFriends(currentUser.id);
+      setFriendIds(friends.map((f) => f.id));
+      setSentReqIds((currentUser.outgoingFriendRequests || []).map((r) => r.toUserId));
+    }
+  };
+
+  useEffect(() => {
+    if (!isOpen) return;
+    loadAccounts();
+
+    const handleAccountsUpdate = () => {
+      loadAccounts();
+    };
+
+    window.addEventListener('pali_accounts_updated', handleAccountsUpdate);
+    return () => {
+      window.removeEventListener('pali_accounts_updated', handleAccountsUpdate);
+    };
+  }, [isOpen, sortTab, currentUser]);
+
+  const showToast = (text: string, type: 'success' | 'info' = 'success') => {
+    setToastMessage({ text, type });
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  const handleAddFriend = (target: UserAccount) => {
+    if (!currentUser) {
+      showToast('กรุณาเข้าสู่ระบบก่อนเพื่อเพิ่มเพื่อน', 'info');
+      return;
+    }
+    const res = sendFriendRequest(currentUser.id, target.id);
+    if (res.success) {
+      setSentReqIds((prev) => [...prev, target.id]);
+      showToast(res.message, 'success');
+      audioManager.playSathuChime();
+    } else {
+      showToast(res.message, 'info');
+    }
+  };
+
+  const handleInviteToRoom = (target: UserAccount) => {
+    if (!currentUser) return;
+    if (currentRoomCode) {
+      sendGameInvite(currentUser, target.id, currentRoomCode);
+      showToast(`ส่งคำชวนเข้าห้อง ${currentRoomCode} ถึง ${target.displayName} แล้ว!`, 'success');
+      audioManager.playSathuChime();
+    } else {
+      if (onOpenCreateRoom) {
+        onClose();
+        onOpenCreateRoom();
+      } else {
+        showToast('กรุณาสร้างห้องเล่นเกมก่อนเพื่อส่งคำชวนเพื่อน', 'info');
+      }
+    }
+  };
 
   if (!isOpen) return null;
 
-  const accounts = getLeaderboardAccounts(sortTab);
   const filteredAccounts = accounts.filter((acc) =>
     acc.displayName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     acc.username.toLowerCase().includes(searchTerm.toLowerCase())
@@ -29,20 +108,47 @@ export const LeaderboardModal: React.FC<Props> = ({ isOpen, onClose, currentUser
   const topThree = filteredAccounts.slice(0, 3);
 
   return (
-    <div className="modal-overlay" style={{ zIndex: 1000 }}>
+    <div className="modal-overlay" style={{ zIndex: 1100 }}>
       <div
         className="glass-panel"
         style={{
           width: '100%',
-          maxWidth: '680px',
+          maxWidth: '740px',
           maxHeight: '92vh',
           overflowY: 'auto',
-          padding: '28px',
+          padding: '24px',
           border: '2px solid var(--primary-gold)',
           boxShadow: '0 0 50px rgba(212, 175, 55, 0.4)',
           position: 'relative',
         }}
       >
+        {/* Toast */}
+        {toastMessage && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '16px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 1200,
+              background: toastMessage.type === 'success' ? 'rgba(16, 185, 129, 0.95)' : 'rgba(59, 130, 246, 0.95)',
+              color: '#fff',
+              padding: '8px 16px',
+              borderRadius: '20px',
+              fontSize: '0.82rem',
+              fontWeight: 600,
+              boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              animation: 'fadeIn 0.2s ease',
+            }}
+          >
+            <Sparkles size={14} />
+            <span>{toastMessage.text}</span>
+          </div>
+        )}
+
         {/* Close Button */}
         <button
           onClick={onClose}
@@ -60,113 +166,133 @@ export const LeaderboardModal: React.FC<Props> = ({ isOpen, onClose, currentUser
         </button>
 
         {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+        <div style={{ textAlign: 'center', marginBottom: '18px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-            <Trophy size={32} color="var(--primary-gold)" />
-            <h2 className="gold-gradient-text" style={{ fontSize: '1.6rem', margin: 0 }}>
-              ทำเนียบมหาเปรียญ (Leaderboard)
+            <Globe size={26} color="#38bdf8" />
+            <Trophy size={30} color="var(--primary-gold)" />
+            <h2 className="gold-gradient-text" style={{ fontSize: '1.5rem', margin: 0 }}>
+              ทำเนียบมหาเปรียญออนไลน์ (Online Leaderboard)
             </h2>
-            <Flame size={32} color="#ef4444" />
+            <Flame size={28} color="#ef4444" />
           </div>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-            จัดอันดับสถิติผู้ชนะต่อเนื่องและเกียรติยศสูงสุดของบัญชีผู้เล่น
+          <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+            จัดอันดับสถิติสดของผู้เล่นและนักศึกษาบาลีทั่วประเทศ (ซิงค์บัญชีออนไลน์อัตโนมัติ)
           </p>
         </div>
 
         {/* Tab Selection */}
         <div
           style={{
-            display: 'flex',
-            gap: '8px',
-            background: 'rgba(0,0,0,0.3)',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(4, 1fr)',
+            gap: '6px',
+            background: 'rgba(0,0,0,0.35)',
             padding: '4px',
             borderRadius: '12px',
-            marginBottom: '20px',
+            marginBottom: '16px',
           }}
         >
           <button
             onClick={() => setSortTab('streak')}
             style={{
-              flex: 1,
-              padding: '10px 8px',
+              padding: '9px 6px',
               borderRadius: '8px',
               border: 'none',
               background: sortTab === 'streak' ? 'linear-gradient(135deg, #ef4444, #f59e0b)' : 'transparent',
               color: '#fff',
               fontWeight: 700,
-              fontSize: '0.85rem',
+              fontSize: '0.78rem',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '6px',
+              gap: '5px',
             }}
           >
-            <Flame size={16} color={sortTab === 'streak' ? '#fff' : '#ef4444'} />
-            ชนะต่อเนื่อง (Win Streak)
+            <Flame size={14} color={sortTab === 'streak' ? '#fff' : '#ef4444'} />
+            ชนะติด (Streak)
           </button>
 
           <button
             onClick={() => setSortTab('wins')}
             style={{
-              flex: 1,
-              padding: '10px 8px',
+              padding: '9px 6px',
               borderRadius: '8px',
               border: 'none',
               background: sortTab === 'wins' ? 'linear-gradient(135deg, #d4af37, #aa7c11)' : 'transparent',
               color: sortTab === 'wins' ? '#090e1a' : '#fff',
               fontWeight: 700,
-              fontSize: '0.85rem',
+              fontSize: '0.78rem',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '6px',
+              gap: '5px',
             }}
           >
-            <Trophy size={16} />
-            ชัยชนะรวม (Total Wins)
+            <Trophy size={14} />
+            ชัยชนะ (Wins)
           </button>
 
           <button
             onClick={() => setSortTab('level')}
             style={{
-              flex: 1,
-              padding: '10px 8px',
+              padding: '9px 6px',
               borderRadius: '8px',
               border: 'none',
               background: sortTab === 'level' ? 'linear-gradient(135deg, #3b82f6, #6366f1)' : 'transparent',
               color: '#fff',
               fontWeight: 700,
-              fontSize: '0.85rem',
+              fontSize: '0.78rem',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '6px',
+              gap: '5px',
             }}
           >
-            <Sparkles size={16} />
-            เลเวล & ยศ (Level)
+            <Sparkles size={14} />
+            ยศ & เลเวล (Level)
+          </button>
+
+          <button
+            onClick={() => setSortTab('wisdom')}
+            style={{
+              padding: '9px 6px',
+              borderRadius: '8px',
+              border: 'none',
+              background: sortTab === 'wisdom' ? 'linear-gradient(135deg, #10b981, #059669)' : 'transparent',
+              color: '#fff',
+              fontWeight: 700,
+              fontSize: '0.78rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '5px',
+            }}
+          >
+            <Coins size={14} />
+            แต้มปัญญา (Wisdom)
           </button>
         </div>
 
         {/* Search Bar */}
-        <div style={{ position: 'relative', marginBottom: '20px' }}>
-          <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+        <div style={{ position: 'relative', marginBottom: '16px' }}>
+          <Search size={15} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="ค้นหาชื่อผู้เล่น..."
+            placeholder="ค้นหาชื่อผู้เล่น, ชื่อผู้ใช้ (Username) หรือรหัสไอดี..."
             style={{
               width: '100%',
-              padding: '8px 12px 8px 36px',
+              padding: '8px 12px 8px 34px',
               borderRadius: '8px',
               background: 'rgba(255,255,255,0.05)',
               border: '1px solid rgba(255,255,255,0.1)',
               color: '#fff',
-              fontSize: '0.85rem',
+              fontSize: '0.82rem',
             }}
           />
         </div>
@@ -178,91 +304,74 @@ export const LeaderboardModal: React.FC<Props> = ({ isOpen, onClose, currentUser
               display: 'grid',
               gridTemplateColumns: 'repeat(3, 1fr)',
               gap: '8px',
-              marginBottom: '20px',
-              alignItems: 'end',
+              marginBottom: '16px',
+              alignItems: 'flex-end',
             }}
           >
             {/* Rank 2 */}
             {topThree[1] && (
               <div
                 style={{
-                  background: 'linear-gradient(180deg, rgba(203, 213, 225, 0.15) 0%, rgba(16, 25, 50, 0.8) 100%)',
-                  border: '1px solid rgba(203, 213, 225, 0.4)',
-                  borderRadius: '10px',
-                  padding: '12px 6px',
+                  background: 'rgba(203, 213, 225, 0.08)',
+                  border: '1px solid #94a3b8',
+                  borderRadius: '12px',
+                  padding: '12px 8px',
                   textAlign: 'center',
-                  minWidth: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '4px',
                 }}
               >
-                <div style={{ fontSize: '1rem', marginBottom: '2px' }}>🥈 #2</div>
+                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#94a3b8' }}>🥈 อันดับ 2</div>
                 <div style={{ fontSize: '1.8rem' }}>{topThree[1].avatar}</div>
-                <div style={{ fontWeight: 700, fontSize: '0.8rem', color: '#fff', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
                   {topThree[1].displayName}
                 </div>
-                <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  Lv.{topThree[1].level} • {topThree[1].rankTitle}
+                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                  Lv.{topThree[1].level}
                 </div>
-
-                <div
-                  style={{
-                    marginTop: '6px',
-                    background: 'rgba(239, 68, 68, 0.2)',
-                    border: '1px solid #ef4444',
-                    borderRadius: '6px',
-                    padding: '3px 4px',
-                    fontSize: '0.7rem',
-                    color: '#fca5a5',
-                    fontWeight: 700,
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                  }}
-                >
-                  🔥 {topThree[1].stats?.currentWinStreak || 0} ตาติด
+                <div style={{ fontSize: '0.75rem', color: '#fbbf24', fontWeight: 700 }}>
+                  {sortTab === 'streak' && `🔥 ${topThree[1].stats?.currentWinStreak || 0} ตาติด`}
+                  {sortTab === 'wins' && `🏆 ${topThree[1].stats?.gamesWon || 0} ชนะ`}
+                  {sortTab === 'level' && `⚡ Lv.${topThree[1].level}`}
+                  {sortTab === 'wisdom' && `💎 ${(topThree[1].stats?.totalWisdomEarned || 0).toLocaleString()} แต้ม`}
                 </div>
               </div>
             )}
 
-            {/* Rank 1 (Tallest) */}
+            {/* Rank 1 */}
             {topThree[0] && (
               <div
                 style={{
-                  background: 'linear-gradient(180deg, rgba(212, 175, 55, 0.25) 0%, rgba(16, 25, 50, 0.9) 100%)',
+                  background: 'linear-gradient(180deg, rgba(212, 175, 55, 0.25), rgba(212, 175, 55, 0.05))',
                   border: '2px solid var(--primary-gold)',
-                  boxShadow: '0 0 20px rgba(212,175,55,0.4)',
-                  borderRadius: '12px',
-                  padding: '16px 6px',
+                  borderRadius: '14px',
+                  padding: '16px 8px',
                   textAlign: 'center',
-                  transform: 'scale(1.03)',
-                  zIndex: 2,
-                  minWidth: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '4px',
+                  boxShadow: '0 0 20px rgba(212, 175, 55, 0.3)',
+                  transform: 'translateY(-6px)',
                 }}
               >
-                <div style={{ fontSize: '1.1rem', marginBottom: '2px' }}>👑 #1</div>
+                <div style={{ fontSize: '0.85rem', fontWeight: 900, color: 'var(--primary-gold)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  👑 🥇 อันดับ 1
+                </div>
                 <div style={{ fontSize: '2.2rem' }}>{topThree[0].avatar}</div>
-                <div style={{ fontWeight: 800, fontSize: '0.9rem', color: 'var(--primary-gold)', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <div style={{ fontSize: '0.88rem', fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
                   {topThree[0].displayName}
                 </div>
-                <div style={{ fontSize: '0.7rem', color: '#fef08a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  Lv.{topThree[0].level} • {topThree[0].rankTitle}
+                <div style={{ fontSize: '0.72rem', color: 'var(--accent-gold)' }}>
+                  {topThree[0].rankTitle}
                 </div>
-
-                <div
-                  style={{
-                    marginTop: '8px',
-                    background: 'linear-gradient(135deg, #ef4444, #f59e0b)',
-                    borderRadius: '6px',
-                    padding: '4px 6px',
-                    fontSize: '0.75rem',
-                    color: '#fff',
-                    fontWeight: 800,
-                    boxShadow: '0 0 8px rgba(245, 158, 11, 0.6)',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                  }}
-                >
-                  🔥 {topThree[0].stats?.currentWinStreak || 0} ตาติด
+                <div style={{ fontSize: '0.82rem', color: '#f59e0b', fontWeight: 800 }}>
+                  {sortTab === 'streak' && `🔥 ${topThree[0].stats?.currentWinStreak || 0} ตาติด (สูงสุด ${topThree[0].stats?.maxWinStreak || 0})`}
+                  {sortTab === 'wins' && `🏆 ${topThree[0].stats?.gamesWon || 0} ชัยชนะ`}
+                  {sortTab === 'level' && `⚡ Lv.${topThree[0].level} (${topThree[0].exp} EXP)`}
+                  {sortTab === 'wisdom' && `💎 ${(topThree[0].stats?.totalWisdomEarned || 0).toLocaleString()} แต้มปัญญา`}
                 </div>
               </div>
             )}
@@ -271,39 +380,30 @@ export const LeaderboardModal: React.FC<Props> = ({ isOpen, onClose, currentUser
             {topThree[2] && (
               <div
                 style={{
-                  background: 'linear-gradient(180deg, rgba(217, 119, 6, 0.15) 0%, rgba(16, 25, 50, 0.8) 100%)',
-                  border: '1px solid rgba(217, 119, 6, 0.4)',
-                  borderRadius: '10px',
-                  padding: '12px 6px',
+                  background: 'rgba(217, 119, 6, 0.08)',
+                  border: '1px solid #d97706',
+                  borderRadius: '12px',
+                  padding: '12px 8px',
                   textAlign: 'center',
-                  minWidth: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '4px',
                 }}
               >
-                <div style={{ fontSize: '1rem', marginBottom: '2px' }}>🥉 #3</div>
+                <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#d97706' }}>🥉 อันดับ 3</div>
                 <div style={{ fontSize: '1.8rem' }}>{topThree[2].avatar}</div>
-                <div style={{ fontWeight: 700, fontSize: '0.8rem', color: '#fff', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
                   {topThree[2].displayName}
                 </div>
-                <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  Lv.{topThree[2].level} • {topThree[2].rankTitle}
+                <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                  Lv.{topThree[2].level}
                 </div>
-
-                <div
-                  style={{
-                    marginTop: '6px',
-                    background: 'rgba(239, 68, 68, 0.2)',
-                    border: '1px solid #ef4444',
-                    borderRadius: '6px',
-                    padding: '3px 4px',
-                    fontSize: '0.7rem',
-                    color: '#fca5a5',
-                    fontWeight: 700,
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                  }}
-                >
-                  🔥 {topThree[2].stats?.currentWinStreak || 0} ตาติด
+                <div style={{ fontSize: '0.75rem', color: '#fbbf24', fontWeight: 700 }}>
+                  {sortTab === 'streak' && `🔥 ${topThree[2].stats?.currentWinStreak || 0} ตาติด`}
+                  {sortTab === 'wins' && `🏆 ${topThree[2].stats?.gamesWon || 0} ชนะ`}
+                  {sortTab === 'level' && `⚡ Lv.${topThree[2].level}`}
+                  {sortTab === 'wisdom' && `💎 ${(topThree[2].stats?.totalWisdomEarned || 0).toLocaleString()} แต้ม`}
                 </div>
               </div>
             )}
@@ -322,14 +422,15 @@ export const LeaderboardModal: React.FC<Props> = ({ isOpen, onClose, currentUser
               fontWeight: 600,
             }}
           >
-            <span>ผู้เข้าแข่งขัน</span>
-            <span>สถิติหลัก</span>
+            <span>ผู้เข้าแข่งขันออนไลน์ ({filteredAccounts.length} บัญชี)</span>
+            <span>สถิติหลัก / การกระทำ</span>
           </div>
 
           {filteredAccounts.map((acc, index) => {
-            const isMe = currentUserId === acc.id;
+            const isMe = currentUser?.id === acc.id;
             const rank = index + 1;
-            const currentStreak = acc.stats?.currentWinStreak || 0;
+            const isFriend = friendIds.includes(acc.id);
+            const isSentReq = sentReqIds.includes(acc.id);
 
             return (
               <div
@@ -338,10 +439,10 @@ export const LeaderboardModal: React.FC<Props> = ({ isOpen, onClose, currentUser
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  padding: '8px 10px',
-                  borderRadius: '8px',
+                  padding: '8px 12px',
+                  borderRadius: '10px',
                   background: isMe
-                    ? 'rgba(212, 175, 55, 0.2)'
+                    ? 'rgba(212, 175, 55, 0.18)'
                     : rank <= 3
                     ? 'rgba(255,255,255,0.06)'
                     : 'rgba(255,255,255,0.02)',
@@ -349,7 +450,7 @@ export const LeaderboardModal: React.FC<Props> = ({ isOpen, onClose, currentUser
                     ? '1.5px solid var(--primary-gold)'
                     : rank === 1
                     ? '1px solid var(--primary-gold)'
-                    : '1px solid rgba(255,255,255,0.06)',
+                    : '1px solid rgba(255,255,255,0.07)',
                   transition: 'all 0.2s',
                   gap: '8px',
                 }}
@@ -375,63 +476,138 @@ export const LeaderboardModal: React.FC<Props> = ({ isOpen, onClose, currentUser
                     #{rank}
                   </div>
 
-                  <div style={{ fontSize: '1.3rem', flexShrink: 0 }}>{acc.avatar}</div>
+                  <div style={{ fontSize: '1.3rem', flexShrink: 0, position: 'relative' }}>
+                    {acc.avatar}
+                    <span
+                      style={{
+                        position: 'absolute',
+                        bottom: '-1px',
+                        right: '-2px',
+                        width: '8px',
+                        height: '8px',
+                        borderRadius: '50%',
+                        background: '#22c55e',
+                        border: '1.5px solid #090e1a',
+                      }}
+                      title="🟢 กำลังออนไลน์ในระบบ"
+                    />
+                  </div>
 
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
                       <span style={{ fontWeight: 700, color: (acc.isDeveloper || acc.role === 'developer') ? '#38bdf8' : isMe ? 'var(--primary-gold)' : '#fff', fontSize: '0.82rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                         {acc.displayName}
                       </span>
                       {(acc.isDeveloper || acc.role === 'developer') && (
-                        <span style={{ background: '#0284c7', color: '#fff', fontSize: '0.6rem', padding: '1px 4px', borderRadius: '4px', fontWeight: 800, flexShrink: 0 }}>
+                        <span style={{ background: '#0284c7', color: '#fff', fontSize: '0.58rem', padding: '1px 4px', borderRadius: '4px', fontWeight: 800, flexShrink: 0 }}>
                           DEV
                         </span>
                       )}
                       {isMe && (
-                        <span style={{ background: 'var(--primary-gold)', color: '#090e1a', fontSize: '0.6rem', padding: '1px 4px', borderRadius: '4px', fontWeight: 800, flexShrink: 0 }}>
+                        <span style={{ background: 'var(--primary-gold)', color: '#090e1a', fontSize: '0.58rem', padding: '1px 4px', borderRadius: '4px', fontWeight: 800, flexShrink: 0 }}>
                           คุณ
                         </span>
                       )}
                     </div>
-                    <div style={{ fontSize: '0.68rem', color: (acc.isDeveloper || acc.role === 'developer') ? '#38bdf8' : 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      Lv.{acc.level} • {acc.rankTitle}
+                    <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      @{acc.username} • Lv.{acc.level} ({acc.rankTitle})
                     </div>
                   </div>
                 </div>
 
-                {/* Main Sort Stat Metric */}
-                <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                  {sortTab === 'streak' && (
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '3px', color: '#f59e0b', fontWeight: 700, fontSize: '0.82rem' }}>
-                        <Flame size={13} color="#ef4444" />
-                        <span>{currentStreak} ติด</span>
+                {/* Right Stat & Action buttons */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+                  {/* Metric Value */}
+                  <div style={{ textAlign: 'right' }}>
+                    {sortTab === 'streak' && (
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '3px', color: '#f59e0b', fontWeight: 700, fontSize: '0.82rem' }}>
+                          <Flame size={13} color="#ef4444" />
+                          <span>{acc.stats?.currentWinStreak || 0} ติด</span>
+                        </div>
+                        <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                          สูงสุด {acc.stats?.maxWinStreak || 0}
+                        </div>
                       </div>
-                      <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
-                        สูงสุด {acc.stats?.maxWinStreak || 0}
-                      </div>
-                    </div>
-                  )}
+                    )}
 
-                  {sortTab === 'wins' && (
-                    <div>
-                      <div style={{ fontWeight: 700, color: 'var(--primary-gold)', fontSize: '0.85rem' }}>
-                        🏆 {acc.stats?.gamesWon || 0} ชนะ
+                    {sortTab === 'wins' && (
+                      <div>
+                        <div style={{ fontWeight: 700, color: 'var(--primary-gold)', fontSize: '0.85rem' }}>
+                          🏆 {acc.stats?.gamesWon || 0} ชนะ
+                        </div>
+                        <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                          เล่น {acc.stats?.gamesPlayed || 0} เกม
+                        </div>
                       </div>
-                      <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
-                        เล่น {acc.stats?.gamesPlayed || 0} เกม
-                      </div>
-                    </div>
-                  )}
+                    )}
 
-                  {sortTab === 'level' && (
-                    <div>
-                      <div style={{ fontWeight: 700, color: '#38bdf8', fontSize: '0.85rem' }}>
-                        Lv.{acc.level}
+                    {sortTab === 'level' && (
+                      <div>
+                        <div style={{ fontWeight: 700, color: '#38bdf8', fontSize: '0.85rem' }}>
+                          Lv.{acc.level}
+                        </div>
+                        <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                          {acc.exp || 0} EXP
+                        </div>
                       </div>
-                      <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
-                        {acc.exp || 0} EXP
+                    )}
+
+                    {sortTab === 'wisdom' && (
+                      <div>
+                        <div style={{ fontWeight: 700, color: '#10b981', fontSize: '0.85rem' }}>
+                          💎 {(acc.stats?.totalWisdomEarned || 0).toLocaleString()}
+                        </div>
+                        <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                          ตอบถูก {acc.stats?.correctAnswers || 0} ข้อ
+                        </div>
                       </div>
+                    )}
+                  </div>
+
+                  {/* Actions: Add Friend / Invite to Room */}
+                  {!isMe && currentUser && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      {isFriend ? (
+                        <button
+                          onClick={() => handleInviteToRoom(acc)}
+                          className="gold-button"
+                          style={{ padding: '4px 8px', fontSize: '0.7rem', borderRadius: '6px', gap: '3px' }}
+                          title="ชวนเข้าห้องเล่นเกม"
+                        >
+                          <Gamepad2 size={12} />
+                          <span>ชวนเล่น</span>
+                        </button>
+                      ) : isSentReq ? (
+                        <button
+                          disabled
+                          style={{
+                            padding: '4px 8px',
+                            fontSize: '0.7rem',
+                            borderRadius: '6px',
+                            background: 'rgba(255,255,255,0.08)',
+                            color: 'var(--text-muted)',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            cursor: 'default',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '3px',
+                          }}
+                        >
+                          <Check size={12} color="#10b981" />
+                          <span>ส่งแล้ว</span>
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleAddFriend(acc)}
+                          className="secondary-button"
+                          style={{ padding: '4px 8px', fontSize: '0.7rem', borderRadius: '6px', gap: '3px' }}
+                          title="เพิ่มเป็นเพื่อน"
+                        >
+                          <UserPlus size={12} />
+                          <span>แอดเพื่อน</span>
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>

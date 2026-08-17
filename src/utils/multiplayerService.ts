@@ -7,6 +7,7 @@ import type {
   LobbyChatMessage,
   InGameChatMessage,
 } from '../types/multiplayer';
+import { syncExternalAccounts, getStoredAccounts } from './authService';
 
 export type MultiplayerEventListener = (payload: any, senderId?: string, packet?: NetworkPacket) => void;
 
@@ -326,6 +327,14 @@ export class MultiplayerService {
             timestamp: Date.now(),
             payload: { member: myMember },
           });
+          conn.send({
+            id: `pkt_${Date.now()}_acc_sync_client`,
+            type: 'ACCOUNT_REGISTRY_SYNC',
+            roomCode,
+            senderId: this.currentMemberId,
+            timestamp: Date.now(),
+            payload: { accounts: getStoredAccounts() },
+          });
         });
 
         conn.on('data', (data: any) => {
@@ -362,6 +371,16 @@ export class MultiplayerService {
         },
       };
       conn.send(syncPacket);
+
+      // Send accounts sync to the new client
+      conn.send({
+        id: `pkt_${Date.now()}_acc_sync_host`,
+        type: 'ACCOUNT_REGISTRY_SYNC',
+        roomCode: this.currentRoomCode || '',
+        senderId: this.currentMemberId,
+        timestamp: Date.now(),
+        payload: { accounts: getStoredAccounts() },
+      });
     });
 
     conn.on('data', (data: any) => {
@@ -510,6 +529,13 @@ export class MultiplayerService {
 
       case 'GAME_START': {
         this.emit('game_start', packet.payload.config);
+        break;
+      }
+
+      case 'ACCOUNT_REGISTRY_SYNC': {
+        if (Array.isArray(packet.payload?.accounts)) {
+          syncExternalAccounts(packet.payload.accounts, false);
+        }
         break;
       }
 

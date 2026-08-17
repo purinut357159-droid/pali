@@ -287,6 +287,21 @@ export const App: React.FC = () => {
         handleAnswerQuiz(payload.isCorrect, payload.speedBonus, payload.timeTaken, false);
       }),
 
+      multiplayerService.on('tile_inspection', (payload: any) => {
+        if (payload?.tileName && payload?.playerName) {
+          setRemotePlayerNotice(`📖 ${payload.playerName} กำลังพิจารณาซื้อ/อัปเกรดวิชา "${payload.tileName}"...`);
+        } else {
+          setRemotePlayerNotice(null);
+        }
+      }),
+
+      multiplayerService.on('event_card_trigger', (payload: any) => {
+        const targetPlayer = gameState.players.find((p) => p.id === payload.playerId);
+        if (targetPlayer && payload.card) {
+          applyCardEffect(payload.card, targetPlayer, false);
+        }
+      }),
+
       multiplayerService.on('tile_detail_action', (payload: any) => {
         const { action, tileId } = payload;
         const tile = gameState.tiles.find((t) => t.id === tileId);
@@ -299,15 +314,49 @@ export const App: React.FC = () => {
         }
       }),
 
-      multiplayerService.on('turn_change', () => {
-        nextTurn(false);
+      multiplayerService.on('turn_change', (payload: any) => {
+        setActiveQuiz(null);
+        setActiveTileDetail(null);
+        setActiveEventCard(null);
+        setRolledDoubles(false);
+        setRemotePlayerNotice(null);
+
+        if (payload && payload.nextIndex !== undefined) {
+          setGameState((prev) => {
+            const isGameOver = payload.isGameOver || false;
+            const winner = payload.winner || null;
+            return {
+              ...prev,
+              players: payload.players || prev.players,
+              tiles: payload.tiles || prev.tiles,
+              currentTurnPlayerIndex: payload.nextIndex,
+              currentRound: payload.nextRound || prev.currentRound,
+              isDiceRolled: false,
+              gameStatus: isGameOver ? 'game_over' : prev.gameStatus,
+              winner: winner || prev.winner,
+            };
+          });
+
+          const nextP = (payload.players || gameState.players)[payload.nextIndex];
+          if (nextP?.id === myOnlineMemberId) {
+            audioManager.playSathuChime();
+          }
+        } else {
+          nextTurn(false);
+        }
+      }),
+
+      multiplayerService.on('full_state_sync', (payload: any) => {
+        if (payload?.gameState) {
+          setGameState(payload.gameState);
+        }
       }),
     ];
 
     return () => {
       unsubs.forEach((fn) => fn());
     };
-  }, [isOnlineMatch, gameState.players, gameState.tiles, gameState.currentTurnPlayerIndex]);
+  }, [isOnlineMatch, gameState.players, gameState.tiles, gameState.currentTurnPlayerIndex, myOnlineMemberId]);
 
   // Check Game Over and Record Results to User Profile
   useEffect(() => {
@@ -624,9 +673,13 @@ export const App: React.FC = () => {
     }
   };
 
-  const applyCardEffect = (card: CardEffect, player: Player) => {
+  const applyCardEffect = (card: CardEffect, player: Player, broadcast: boolean = true) => {
     setActiveEventCard({ card, player });
     addLog(`${player.name} สุ่มได้: ${card.title}`, card.type === 'boon' ? 'success' : 'danger');
+
+    if (isOnlineMatch && broadcast) {
+      multiplayerService.broadcastGameAction('EVENT_CARD_TRIGGER', { card, playerId: player.id });
+    }
 
     setGameState((prev) => {
       const updatedPlayers = [...prev.players];
@@ -877,17 +930,24 @@ export const App: React.FC = () => {
     setRolledDoubles(false);
     setRemotePlayerNotice(null);
 
-    if (isOnlineMatch && broadcast && multiplayerService.isHost) {
-      multiplayerService.broadcastGameAction('TURN_CHANGE', {});
-    }
-
     setGameState((prev) => {
       let activePlayers = prev.players.filter((p) => !p.isBankrupt);
       if (activePlayers.length <= 1 && prev.players.length > 1) {
+        const overWinner = activePlayers[0] || prev.players[0];
+        if (isOnlineMatch && broadcast) {
+          multiplayerService.broadcastGameAction('TURN_CHANGE', {
+            nextIndex: prev.currentTurnPlayerIndex,
+            nextRound: prev.currentRound,
+            players: prev.players,
+            tiles: prev.tiles,
+            isGameOver: true,
+            winner: overWinner,
+          });
+        }
         return {
           ...prev,
           gameStatus: 'game_over',
-          winner: activePlayers[0] || prev.players[0],
+          winner: overWinner,
         };
       }
 
@@ -912,6 +972,17 @@ export const App: React.FC = () => {
       if (isGameOver) {
         const sorted = [...activePlayers].sort((a, b) => b.wisdomPoints - a.wisdomPoints);
         winner = sorted[0];
+      }
+
+      if (isOnlineMatch && broadcast) {
+        multiplayerService.broadcastGameAction('TURN_CHANGE', {
+          nextIndex,
+          nextRound,
+          players: updatedPlayers,
+          tiles: prev.tiles,
+          isGameOver,
+          winner,
+        });
       }
 
       return {
@@ -1352,7 +1423,12 @@ export const App: React.FC = () => {
       <LeaderboardModal
         isOpen={showLeaderboardModal}
         onClose={() => setShowLeaderboardModal(false)}
-        currentUserId={currentUser?.id}
+        currentUser={currentUser}
+        currentRoomCode={onlineRoomSettings?.roomCode}
+        onOpenCreateRoom={() => {
+          setShowLeaderboardModal(false);
+          setShowOnlineLobbyModal(true);
+        }}
       />
 
       <ChatWidget />
