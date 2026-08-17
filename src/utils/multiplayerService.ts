@@ -27,6 +27,11 @@ export class MultiplayerService {
 
   constructor() {
     this.currentMemberId = `m_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
+    if (typeof window !== 'undefined') {
+      window.addEventListener('pali_accounts_updated', () => {
+        this.broadcastAccountRegistry();
+      });
+    }
   }
 
   public on(event: string, listener: MultiplayerEventListener): () => void {
@@ -535,6 +540,10 @@ export class MultiplayerService {
       case 'ACCOUNT_REGISTRY_SYNC': {
         if (Array.isArray(packet.payload?.accounts)) {
           syncExternalAccounts(packet.payload.accounts, false);
+          // If this node is Host, relay received account registry to all other connected clients
+          if (this.isHost && this.connections.size > 1) {
+            this.sendPacketToAllExcept(packet.senderId, packet);
+          }
         }
         break;
       }
@@ -546,6 +555,25 @@ export class MultiplayerService {
         break;
       }
     }
+  }
+
+  public broadcastAccountRegistry(): void {
+    const accounts = getStoredAccounts();
+    if (this.currentRoomCode) {
+      this.sendPacket('ACCOUNT_REGISTRY_SYNC', { accounts });
+    }
+  }
+
+  private sendPacketToAllExcept(excludeSenderId: string, packet: NetworkPacket): void {
+    this.connections.forEach((conn, peerId) => {
+      if (peerId !== excludeSenderId && conn.open) {
+        try {
+          conn.send(packet);
+        } catch (e) {
+          console.error('Failed to relay packet', e);
+        }
+      }
+    });
   }
 
   private broadcastRoomSync(): void {

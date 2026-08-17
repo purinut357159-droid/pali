@@ -16,6 +16,24 @@ if (accountsChannel) {
   };
 }
 
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key === STORAGE_KEY_ACCOUNTS || e.key === STORAGE_KEY_PUBLIC_REGISTRY) {
+      if (e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          if (Array.isArray(parsed)) {
+            syncExternalAccounts(parsed, false);
+          }
+        } catch {
+          // ignore parse error
+        }
+      }
+      window.dispatchEvent(new Event('pali_accounts_updated'));
+    }
+  });
+}
+
 function hashPassword(password: string): string {
   try {
     return btoa(encodeURIComponent(password));
@@ -264,8 +282,14 @@ export function syncExternalAccounts(incomingAccounts: UserAccount[], broadcast:
       const existing = current[existingIndex];
       const hasUpdates =
         (inc.level || 1) > (existing.level || 1) ||
+        (inc.exp || 0) > (existing.exp || 0) ||
         (inc.stats?.gamesWon || 0) > (existing.stats?.gamesWon || 0) ||
-        (inc.stats?.maxWinStreak || 0) > (existing.stats?.maxWinStreak || 0);
+        (inc.stats?.maxWinStreak || 0) > (existing.stats?.maxWinStreak || 0) ||
+        (inc.stats?.totalWisdomEarned || 0) > (existing.stats?.totalWisdomEarned || 0) ||
+        (inc.stats?.correctAnswers || 0) > (existing.stats?.correctAnswers || 0) ||
+        (inc.stats?.gamesPlayed || 0) > (existing.stats?.gamesPlayed || 0) ||
+        (inc.stats?.examsPassed || 0) > (existing.stats?.examsPassed || 0) ||
+        (inc.stats?.propertiesBought || 0) > (existing.stats?.propertiesBought || 0);
 
       if (hasUpdates) {
         current[existingIndex] = {
@@ -277,13 +301,15 @@ export function syncExternalAccounts(incomingAccounts: UserAccount[], broadcast:
           rankTitle: inc.rankTitle || existing.rankTitle,
           stats: {
             ...existing.stats,
-            gamesPlayed: Math.max(existing.stats.gamesPlayed, inc.stats?.gamesPlayed || 0),
-            gamesWon: Math.max(existing.stats.gamesWon, inc.stats?.gamesWon || 0),
-            maxWinStreak: Math.max(existing.stats.maxWinStreak, inc.stats?.maxWinStreak || 0),
-            currentWinStreak: inc.stats?.currentWinStreak ?? existing.stats.currentWinStreak,
-            correctAnswers: Math.max(existing.stats.correctAnswers, inc.stats?.correctAnswers || 0),
-            totalAnswers: Math.max(existing.stats.totalAnswers, inc.stats?.totalAnswers || 0),
-            totalWisdomEarned: Math.max(existing.stats.totalWisdomEarned, inc.stats?.totalWisdomEarned || 0),
+            gamesPlayed: Math.max(existing.stats?.gamesPlayed || 0, inc.stats?.gamesPlayed || 0),
+            gamesWon: Math.max(existing.stats?.gamesWon || 0, inc.stats?.gamesWon || 0),
+            maxWinStreak: Math.max(existing.stats?.maxWinStreak || 0, inc.stats?.maxWinStreak || 0),
+            currentWinStreak: inc.stats?.currentWinStreak ?? existing.stats?.currentWinStreak ?? 0,
+            correctAnswers: Math.max(existing.stats?.correctAnswers || 0, inc.stats?.correctAnswers || 0),
+            totalAnswers: Math.max(existing.stats?.totalAnswers || 0, inc.stats?.totalAnswers || 0),
+            propertiesBought: Math.max(existing.stats?.propertiesBought || 0, inc.stats?.propertiesBought || 0),
+            examsPassed: Math.max(existing.stats?.examsPassed || 0, inc.stats?.examsPassed || 0),
+            totalWisdomEarned: Math.max(existing.stats?.totalWisdomEarned || 0, inc.stats?.totalWisdomEarned || 0),
           },
         };
         changed = true;
