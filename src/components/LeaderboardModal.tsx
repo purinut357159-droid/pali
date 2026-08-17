@@ -333,6 +333,70 @@ export const LeaderboardModal: React.FC<Props> = ({
           </button>
         </div>
 
+        {/* Current User Rank Status Banner */}
+        {currentUser && (() => {
+          const myRankIndex = accounts.findIndex((a) => a.id === currentUser.id);
+          const myRank = myRankIndex >= 0 ? myRankIndex + 1 : null;
+          const totalScholars = accounts.length;
+          const isBottomRank = myRank === totalScholars;
+
+          if (!myRank) return null;
+
+          return (
+            <div
+              style={{
+                background: 'linear-gradient(135deg, rgba(212, 175, 55, 0.18), rgba(16, 185, 129, 0.12))',
+                border: '1.5px solid var(--primary-gold)',
+                borderRadius: '12px',
+                padding: '10px 14px',
+                marginBottom: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '8px',
+                boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                <div style={{ fontSize: '1.6rem', flexShrink: 0 }}>{currentUser.avatar}</div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                    <strong style={{ color: 'var(--primary-gold)', fontSize: '0.88rem' }}>
+                      {currentUser.displayName}
+                    </strong>
+                    <span
+                      style={{
+                        background: isBottomRank ? 'rgba(239, 68, 68, 0.2)' : 'linear-gradient(135deg, #f59e0b, #d97706)',
+                        color: isBottomRank ? '#fca5a5' : '#090e1a',
+                        border: isBottomRank ? '1px solid #ef4444' : 'none',
+                        padding: '1px 8px',
+                        borderRadius: '12px',
+                        fontSize: '0.68rem',
+                        fontWeight: 800,
+                      }}
+                    >
+                      {isBottomRank ? `📍 อันดับที่ #${myRank} (อันดับเริ่มต้น/ท้ายสุด)` : `👑 อันดับที่ #${myRank} จาก ${totalScholars} คน`}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                    {isBottomRank
+                      ? '🌱 บัญชีเพิ่งสมัคร (อยู่อันดับท้ายสุด) • เล่นเกมและตอบคำถามถูกเพื่อไต่อันดับแซงผู้เล่นคนอื่น!'
+                      : `ยศ ${currentUser.rankTitle} (Lv.${currentUser.level}) • ชนะ ${currentUser.stats?.gamesWon || 0} เกม • ตอบถูก ${currentUser.stats?.correctAnswers || 0} ข้อ`}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>แต้มปัญญาสะสมสด</div>
+                <div style={{ color: '#10b981', fontWeight: 800, fontSize: '0.95rem' }}>
+                  💎 {(currentUser.stats?.totalWisdomEarned || 0).toLocaleString()}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Search Bar */}
         <div style={{ position: 'relative', marginBottom: '16px' }}>
           <Search size={15} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />

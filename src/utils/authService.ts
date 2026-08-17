@@ -761,21 +761,52 @@ export function getLeaderboardAccounts(
 ): UserAccount[] {
   const accounts = getStoredAccounts();
   const sorted = [...accounts].sort((a, b) => {
+    // 1. Primary Sort
     if (sortBy === 'streak') {
       const diff = (b.stats?.maxWinStreak || 0) - (a.stats?.maxWinStreak || 0);
       if (diff !== 0) return diff;
-      return (b.stats?.currentWinStreak || 0) - (a.stats?.currentWinStreak || 0);
+      const currentDiff = (b.stats?.currentWinStreak || 0) - (a.stats?.currentWinStreak || 0);
+      if (currentDiff !== 0) return currentDiff;
     } else if (sortBy === 'wins') {
       const diff = (b.stats?.gamesWon || 0) - (a.stats?.gamesWon || 0);
       if (diff !== 0) return diff;
-      return (b.stats?.totalWisdomEarned || 0) - (a.stats?.totalWisdomEarned || 0);
+      const streakDiff = (b.stats?.maxWinStreak || 0) - (a.stats?.maxWinStreak || 0);
+      if (streakDiff !== 0) return streakDiff;
     } else if (sortBy === 'level') {
       const diff = (b.level || 1) - (a.level || 1);
       if (diff !== 0) return diff;
-      return (b.exp || 0) - (a.exp || 0);
-    } else {
-      return (b.stats?.totalWisdomEarned || 0) - (a.stats?.totalWisdomEarned || 0);
+      const expDiff = (b.exp || 0) - (a.exp || 0);
+      if (expDiff !== 0) return expDiff;
+    } else if (sortBy === 'wisdom') {
+      const diff = (b.stats?.totalWisdomEarned || 0) - (a.stats?.totalWisdomEarned || 0);
+      if (diff !== 0) return diff;
     }
+
+    // 2. Secondary Tie-Breakers (Wins -> Total Wisdom -> Level -> Correct Answers -> Games Played)
+    const winsDiff = (b.stats?.gamesWon || 0) - (a.stats?.gamesWon || 0);
+    if (winsDiff !== 0) return winsDiff;
+
+    const wisdomDiff = (b.stats?.totalWisdomEarned || 0) - (a.stats?.totalWisdomEarned || 0);
+    if (wisdomDiff !== 0) return wisdomDiff;
+
+    const levelDiff = (b.level || 1) - (a.level || 1);
+    if (levelDiff !== 0) return levelDiff;
+
+    const expDiff = (b.exp || 0) - (a.exp || 0);
+    if (expDiff !== 0) return expDiff;
+
+    const correctDiff = (b.stats?.correctAnswers || 0) - (a.stats?.correctAnswers || 0);
+    if (correctDiff !== 0) return correctDiff;
+
+    const playedDiff = (b.stats?.gamesPlayed || 0) - (a.stats?.gamesPlayed || 0);
+    if (playedDiff !== 0) return playedDiff;
+
+    // 3. Final Tie-Breaker for 0-score / newly registered accounts:
+    // Earlier registered accounts rank above newer accounts with 0 score,
+    // so a freshly registered account (newest timestamp) will ALWAYS sit at the bottom / last rank (#N)!
+    const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    return timeA - timeB;
   });
 
   return sorted;
