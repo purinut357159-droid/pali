@@ -335,6 +335,60 @@ export const LeaderboardModal: React.FC<Props> = ({
 
         {/* Current User Rank Status Banner */}
         {currentUser && (() => {
+          const isDev = currentUser.isDeveloper || currentUser.role === 'developer' || currentUser.username.toLowerCase() === 'developer';
+
+          if (isDev) {
+            return (
+              <div
+                style={{
+                  background: 'linear-gradient(135deg, rgba(2, 132, 199, 0.22), rgba(59, 130, 246, 0.15))',
+                  border: '1.5px solid #38bdf8',
+                  borderRadius: '12px',
+                  padding: '10px 14px',
+                  marginBottom: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '8px',
+                  boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                  <div style={{ fontSize: '1.6rem', flexShrink: 0 }}>💻</div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                      <strong style={{ color: '#38bdf8', fontSize: '0.88rem' }}>
+                        {currentUser.displayName}
+                      </strong>
+                      <span
+                        style={{
+                          background: '#0284c7',
+                          color: '#fff',
+                          padding: '1px 8px',
+                          borderRadius: '10px',
+                          fontSize: '0.65rem',
+                          fontWeight: 800,
+                        }}
+                      >
+                        👑 โหมดผู้พัฒนา
+                      </span>
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: '2px' }}>
+                      บัญชีผู้พัฒนาถูกแยกออกจากการจัดอันดับแข่งขัน เพื่อความโปร่งใสและยุติธรรมสำหรับผู้เล่นจริง
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                  <span style={{ fontSize: '0.75rem', color: '#38bdf8', fontWeight: 700, background: 'rgba(2, 132, 199, 0.25)', padding: '4px 10px', borderRadius: '8px', border: '1px solid rgba(56, 189, 248, 0.3)' }}>
+                    ตารางแสดง {accounts.length} ผู้เล่นจริง
+                  </span>
+                </div>
+              </div>
+            );
+          }
+
           const myRankIndex = accounts.findIndex((a) => a.id === currentUser.id);
           const myRank = myRankIndex >= 0 ? myRankIndex + 1 : null;
           const totalScholars = accounts.length;
@@ -376,7 +430,7 @@ export const LeaderboardModal: React.FC<Props> = ({
                         fontWeight: 800,
                       }}
                     >
-                      {isBottomRank ? `📍 อันดับที่ #${myRank} (อันดับเริ่มต้น/ท้ายสุด)` : `👑 อันดับที่ #${myRank} จาก ${totalScholars} คน`}
+                      {isBottomRank ? `📍 อันดับที่ #${myRank} (อันดับเริ่มต้น/ท้ายสุด)` : `👑 อันดับที่ #${myRank} จาก ${totalScholars} ผู้เล่น`}
                     </span>
                   </div>
                   <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>

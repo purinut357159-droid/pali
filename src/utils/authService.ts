@@ -1,6 +1,7 @@
 import type { UserAccount, AuthSession, Achievement } from '../types/auth';
 import { ACHIEVEMENTS_LIST, getRankTitle } from '../types/auth';
 import type { ReviewItem, CharacterId } from '../types/game';
+import { cloudStorageService } from './cloudStorageService';
 
 const STORAGE_KEY_ACCOUNTS = 'pali_accounts_v2';
 const STORAGE_KEY_SESSION = 'pali_session_v2';
@@ -425,6 +426,7 @@ export function registerAccount(
 
   const updatedAccounts = [newAccount, ...accounts];
   saveStoredAccounts(updatedAccounts);
+  cloudStorageService.saveAccountToCloud(newAccount);
 
   const session: AuthSession = {
     userId: newAccount.id,
@@ -695,6 +697,7 @@ export function recordMatchResult(
 
   accounts[userIndex] = user;
   saveStoredAccounts(accounts);
+  cloudStorageService.saveAccountToCloud(user);
 
   // Sync session
   const currentSession = getCurrentSession();
@@ -771,6 +774,7 @@ export function liveRecordStatChange(
 
   accounts[userIndex] = user;
   saveStoredAccounts(accounts, true);
+  cloudStorageService.saveAccountToCloud(user);
 
   const currentSession = getCurrentSession();
   if (currentSession && currentSession.userId === userId) {
@@ -785,8 +789,18 @@ export function liveRecordStatChange(
 export function getLeaderboardAccounts(
   sortBy: 'streak' | 'wins' | 'level' | 'wisdom' = 'streak'
 ): UserAccount[] {
-  const accounts = getStoredAccounts();
-  const sorted = [...accounts].sort((a, b) => {
+  const allAccounts = getStoredAccounts();
+
+  // EXCLUDE DEVELOPER ACCOUNTS from Leaderboard Rankings
+  const realPlayers = allAccounts.filter(
+    (acc) =>
+      !acc.isDeveloper &&
+      acc.role !== 'developer' &&
+      acc.username.toLowerCase() !== 'developer' &&
+      acc.id !== 'user_dev_root'
+  );
+
+  const sorted = [...realPlayers].sort((a, b) => {
     // 1. Primary Sort
     if (sortBy === 'streak') {
       const diff = (b.stats?.maxWinStreak || 0) - (a.stats?.maxWinStreak || 0);
