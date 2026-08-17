@@ -8,6 +8,7 @@ import type {
   InGameChatMessage,
 } from '../types/multiplayer';
 import { syncExternalAccounts, getStoredAccounts } from './authService';
+import { publicDiscoveryService } from './publicDiscoveryService';
 
 export type MultiplayerEventListener = (payload: any, senderId?: string, packet?: NetworkPacket) => void;
 
@@ -107,6 +108,20 @@ export class MultiplayerService {
     this.setupPeerAsHost(cleanCode);
 
     this.savePublicRoomInfo();
+    if (!this.settings.isPrivate) {
+      publicDiscoveryService.startAnnouncingPublicRoom({
+        roomCode: cleanCode,
+        roomName: this.settings.roomName,
+        hostName: hostMember.displayName,
+        hostAvatar: hostMember.avatar,
+        mode: this.settings.mode as any,
+        currentPlayers: this.members.length,
+        maxPlayers: this.settings.maxPlayers,
+        status: 'waiting',
+        hostId: this.currentMemberId,
+      });
+    }
+
     this.emit('room_state_change', { settings: this.settings, members: this.members });
 
     return { success: true, roomCode: cleanCode };
@@ -141,6 +156,8 @@ export class MultiplayerService {
   }
 
   public leaveRoom(): void {
+    publicDiscoveryService.stopAnnouncingPublicRoom();
+
     if (this.currentRoomCode) {
       this.sendPacket('ROOM_LEAVE', { memberId: this.currentMemberId });
       this.removePublicRoomInfo(this.currentRoomCode);
@@ -245,6 +262,7 @@ export class MultiplayerService {
 
   public startGame(initialConfig: any): void {
     if (!this.isHost) return;
+    publicDiscoveryService.updateAnnouncedRoomPlayerCount(this.members.length, 'in_game');
     this.sendPacket('GAME_START', { config: initialConfig });
     this.emit('game_start', initialConfig);
   }
@@ -467,6 +485,7 @@ export class MultiplayerService {
           if (this.isHost) {
             this.broadcastRoomSync();
             this.savePublicRoomInfo();
+            publicDiscoveryService.updateAnnouncedRoomPlayerCount(this.members.length, 'waiting');
           }
         }
         break;
@@ -481,6 +500,7 @@ export class MultiplayerService {
         if (this.isHost) {
           this.broadcastRoomSync();
           this.savePublicRoomInfo();
+          publicDiscoveryService.updateAnnouncedRoomPlayerCount(this.members.length, 'waiting');
         }
         break;
       }
@@ -592,21 +612,40 @@ export class MultiplayerService {
     roomCode: string;
     roomName: string;
     hostName: string;
+    hostAvatar?: string;
     playerCount: number;
     maxPlayers: number;
     mode: string;
     maxRounds: number;
+    status?: 'waiting' | 'in_game';
     updatedAt: number;
   }[] {
+    const fromMqtt = publicDiscoveryService.getKnownPublicRooms();
+    const mappedMqtt = fromMqtt.map((r) => ({
+      roomCode: r.roomCode,
+      roomName: r.roomName,
+      hostName: r.hostName,
+      hostAvatar: r.hostAvatar,
+      playerCount: r.currentPlayers,
+      maxPlayers: r.maxPlayers,
+      mode: r.mode,
+      maxRounds: 20,
+      status: r.status,
+      updatedAt: r.timestamp,
+    }));
+
     try {
       const raw = localStorage.getItem('pali_public_rooms_v2');
-      if (!raw) return [];
-      const rooms: any[] = JSON.parse(raw);
+      const localRooms: any[] = raw ? JSON.parse(raw) : [];
       const now = Date.now();
-      // Keep only active rooms updated in last 5 minutes
-      return rooms.filter((r) => now - r.updatedAt < 5 * 60 * 1000);
+      const validLocal = localRooms.filter((r) => now - r.updatedAt < 5 * 60 * 1000);
+
+      const map = new Map<string, any>();
+      validLocal.forEach((r) => map.set(r.roomCode, r));
+      mappedMqtt.forEach((r) => map.set(r.roomCode, r));
+      return Array.from(map.values());
     } catch {
-      return [];
+      return mappedMqtt;
     }
   }
 

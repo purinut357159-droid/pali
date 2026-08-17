@@ -33,6 +33,7 @@ import {
 import { checkPropertyCombo, UPGRADE_NAMES } from './utils/comboEngine';
 import { multiplayerService } from './utils/multiplayerService';
 import { getPendingInvitesForUser, clearInvite } from './utils/friendService';
+import { publicDiscoveryService } from './utils/publicDiscoveryService';
 import { Check, X, Sparkles } from 'lucide-react';
 
 function shuffleQuestionOptions(q: Question): Question {
@@ -133,10 +134,18 @@ export const App: React.FC = () => {
       if (updatedUser) setCurrentUser(updatedUser);
     };
 
+    const unsubGlobalInvite = publicDiscoveryService.onInvite((invite) => {
+      if (currentUser && invite.toUserId === currentUser.id) {
+        setActiveInviteBanner(invite);
+        audioManager.playSathuChime();
+      }
+    });
+
     window.addEventListener('pali_accounts_updated', handleAccountSync);
     window.addEventListener('storage', handleAccountSync);
 
     return () => {
+      unsubGlobalInvite();
       window.removeEventListener('pali_accounts_updated', handleAccountSync);
       window.removeEventListener('storage', handleAccountSync);
     };

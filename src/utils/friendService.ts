@@ -1,5 +1,6 @@
 import type { UserAccount, GameInvite } from '../types/auth';
 import { getStoredAccounts, saveStoredAccounts } from './authService';
+import { publicDiscoveryService } from './publicDiscoveryService';
 
 const INVITE_STORAGE_KEY = 'pali_game_invites_v2';
 const inviteChannel = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel('pali_invites_channel') : null;
@@ -336,6 +337,8 @@ export function sendGameInvite(
   if (inviteChannel) {
     inviteChannel.postMessage({ type: 'NEW_INVITE', invite: newInvite });
   }
+
+  publicDiscoveryService.sendInvite(newInvite);
 
   return { success: true, message: `ส่งคำชวนเล่นห้อง ${roomCode} เรียบร้อยแล้ว!` };
 }

@@ -22,6 +22,7 @@ import type { RoomMember, RoomSettings, LobbyChatMessage } from '../types/multip
 import { CHARACTERS } from '../data/charactersData';
 import { multiplayerService, MultiplayerService } from '../utils/multiplayerService';
 import { getFriends, sendGameInvite } from '../utils/friendService';
+import { publicDiscoveryService } from '../utils/publicDiscoveryService';
 import { audioManager } from '../utils/audioManager';
 
 interface Props {
@@ -89,9 +90,12 @@ export const OnlineLobbyModal: React.FC<Props> = ({
   }, [initialRoomCode]);
 
   useEffect(() => {
-    if (isOpen) {
+    if (!isOpen) return;
+    setPublicRooms(MultiplayerService.getPublicRooms());
+    const unsub = publicDiscoveryService.onRoomsUpdate(() => {
       setPublicRooms(MultiplayerService.getPublicRooms());
-    }
+    });
+    return () => unsub();
   }, [isOpen, view]);
 
   // Listen to multiplayer network events
@@ -766,65 +770,133 @@ export const OnlineLobbyModal: React.FC<Props> = ({
               {/* PUBLIC ROOMS TAB */}
               {view === 'public' && (
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-                    <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>ห้องที่กำลังเปิดรับสมัครผู้เล่น:</span>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span
+                        style={{
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          background: '#22c55e',
+                          animation: 'pulse 1.2s infinite',
+                        }}
+                      />
+                      <span style={{ fontSize: '0.85rem', color: '#4ade80', fontWeight: 700 }}>
+                        ห้องสาธารณะออนไลน์สด (Real-time Swarm)
+                      </span>
+                    </div>
                     <button
                       onClick={() => setPublicRooms(MultiplayerService.getPublicRooms())}
                       className="secondary-button"
-                      style={{ padding: '4px 10px', fontSize: '0.75rem', borderRadius: '6px' }}
+                      style={{ padding: '4px 10px', fontSize: '0.75rem', borderRadius: '6px', display: 'flex', alignItems: 'center', gap: '4px' }}
                     >
-                      <RefreshCw size={13} /> รีเฟรช
+                      <RefreshCw size={13} /> รีเฟรชสด
                     </button>
                   </div>
 
                   {publicRooms.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '30px 10px', color: 'var(--text-muted)' }}>
-                      <Radio size={36} style={{ opacity: 0.5, marginBottom: '8px' }} />
-                      <p style={{ fontSize: '0.88rem' }}>ยังไม่มีห้องสาธารณะที่เปิดอยู่ในขณะนี้</p>
-                      <button onClick={() => setView('create')} className="gold-button" style={{ marginTop: '10px', fontSize: '0.8rem', padding: '6px 14px' }}>
-                        สร้างห้องคนแรกเลย!
+                    <div style={{ textAlign: 'center', padding: '36px 14px', color: 'var(--text-muted)', background: 'rgba(255,255,255,0.02)', borderRadius: '12px', border: '1px dashed rgba(212,175,55,0.2)' }}>
+                      <Radio size={40} style={{ opacity: 0.6, color: 'var(--primary-gold)', marginBottom: '8px' }} />
+                      <p style={{ fontSize: '0.92rem', color: '#fff', fontWeight: 600 }}>ยังไม่มีห้องสาธารณะที่เปิดอยู่ในขณะนี้</p>
+                      <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', maxWidth: '320px', margin: '4px auto 14px auto' }}>
+                        ท่านสามารถสร้างห้องสาธารณะคนแรก เพื่อให้ผู้เล่นและนักศึกษาบาลีทั่วประเทศค้นพบและกดเข้าร่วมได้ทันที!
+                      </p>
+                      <button onClick={() => setView('create')} className="gold-button" style={{ fontSize: '0.85rem', padding: '8px 18px' }}>
+                        👑 สร้างห้องสาธารณะคนแรกเลย!
                       </button>
                     </div>
                   ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {publicRooms.map((room) => (
-                        <div
-                          key={room.roomCode}
-                          style={{
-                            padding: '12px 16px',
-                            background: 'rgba(255, 255, 255, 0.04)',
-                            borderRadius: '10px',
-                            border: '1px solid rgba(212, 175, 55, 0.2)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            flexWrap: 'wrap',
-                            gap: '10px',
-                          }}
-                        >
-                          <div>
-                            <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#fff' }}>
-                              {room.roomName} <code style={{ color: 'var(--primary-gold)', fontSize: '0.8rem' }}>({room.roomCode})</code>
-                            </div>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                              เจ้าสำนัก: {room.hostName} • โหมด: {room.mode} • {room.maxRounds} รอบ
-                            </div>
-                          </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {publicRooms.map((room) => {
+                        const isFull = room.playerCount >= room.maxPlayers;
+                        const isPlaying = room.status === 'in_game';
 
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <span style={{ fontSize: '0.8rem', color: 'var(--accent-cyan)', fontWeight: 600 }}>
-                              👥 {room.playerCount}/{room.maxPlayers} คน
-                            </span>
-                            <button
-                              onClick={() => handleJoinRoom(room.roomCode)}
-                              className="gold-button"
-                              style={{ padding: '6px 14px', fontSize: '0.8rem', borderRadius: '8px' }}
-                            >
-                              เข้าร่วม
-                            </button>
+                        return (
+                          <div
+                            key={room.roomCode}
+                            style={{
+                              padding: '12px 16px',
+                              background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(212, 175, 55, 0.05))',
+                              borderRadius: '12px',
+                              border: isPlaying ? '1px solid rgba(255,255,255,0.1)' : '1.5px solid rgba(212, 175, 55, 0.35)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              flexWrap: 'wrap',
+                              gap: '10px',
+                              boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <div style={{ fontSize: '1.6rem' }}>{room.hostAvatar || '🧘‍♂️'}</div>
+                              <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                                  <span style={{ fontWeight: 700, fontSize: '0.92rem', color: '#fff' }}>
+                                    {room.roomName}
+                                  </span>
+                                  <code
+                                    style={{
+                                      background: 'rgba(212, 175, 55, 0.2)',
+                                      color: 'var(--primary-gold)',
+                                      padding: '1px 6px',
+                                      borderRadius: '4px',
+                                      fontSize: '0.75rem',
+                                      fontWeight: 800,
+                                    }}
+                                  >
+                                    {room.roomCode}
+                                  </code>
+                                  <span
+                                    style={{
+                                      background: isPlaying ? 'rgba(239, 68, 68, 0.2)' : 'rgba(34, 197, 94, 0.2)',
+                                      color: isPlaying ? '#f87171' : '#4ade80',
+                                      border: isPlaying ? '1px solid rgba(239,68,68,0.4)' : '1px solid rgba(34,197,94,0.4)',
+                                      fontSize: '0.65rem',
+                                      padding: '1px 6px',
+                                      borderRadius: '10px',
+                                      fontWeight: 700,
+                                    }}
+                                  >
+                                    {isPlaying ? '🎮 กำลังแข่งขัน' : '🟢 รอผู้เล่น'}
+                                  </span>
+                                </div>
+                                <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                  เจ้าสำนัก: <strong style={{ color: '#e2e8f0' }}>{room.hostName}</strong> • โหมด: {room.mode === 'points' ? '🏆 แต้มปัญญา' : room.mode === 'monopoly' ? '🏛️ มหาเศรษฐี' : '⚡ เอาตัวรอด'} • {room.maxRounds} รอบ
+                                </div>
+                              </div>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <span
+                                style={{
+                                  fontSize: '0.82rem',
+                                  color: isFull ? '#ef4444' : '#38bdf8',
+                                  fontWeight: 700,
+                                  background: 'rgba(0,0,0,0.3)',
+                                  padding: '4px 8px',
+                                  borderRadius: '6px',
+                                }}
+                              >
+                                👥 {room.playerCount}/{room.maxPlayers} {isFull ? '(ห้องเต็ม)' : 'คน'}
+                              </span>
+                              <button
+                                onClick={() => handleJoinRoom(room.roomCode)}
+                                disabled={isFull}
+                                className="gold-button"
+                                style={{
+                                  padding: '7px 16px',
+                                  fontSize: '0.82rem',
+                                  borderRadius: '8px',
+                                  opacity: isFull ? 0.5 : 1,
+                                  cursor: isFull ? 'not-allowed' : 'pointer',
+                                }}
+                              >
+                                {isFull ? 'ห้องเต็ม' : 'เข้าร่วม'}
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
