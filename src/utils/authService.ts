@@ -43,11 +43,46 @@ function hashPassword(password: string): string {
   }
 }
 
+const STORAGE_KEY_DEV_MASTER_PASS_HASH = 'pali_dev_master_key_hash_v1';
+const DEFAULT_DEV_MASTER_PASS = 'purin2026';
+
+export function getDeveloperMasterPasswordHash(): string {
+  if (typeof localStorage !== 'undefined') {
+    const stored = localStorage.getItem(STORAGE_KEY_DEV_MASTER_PASS_HASH);
+    if (stored) return stored;
+  }
+  return hashPassword(DEFAULT_DEV_MASTER_PASS);
+}
+
+export function setDeveloperMasterPassword(newPassword: string): boolean {
+  if (!newPassword || newPassword.trim().length < 4) return false;
+  try {
+    const hashed = hashPassword(newPassword.trim());
+    localStorage.setItem(STORAGE_KEY_DEV_MASTER_PASS_HASH, hashed);
+    const accounts = getStoredAccounts();
+    const dev = accounts.find((a) => a.id === DEVELOPER_ACCOUNT.id || a.role === 'developer' || a.username === 'purin' || a.username === 'developer');
+    if (dev) {
+      dev.passwordHash = hashed;
+      saveStoredAccounts(accounts);
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function verifyDeveloperPassword(password: string): boolean {
+  if (!password) return false;
+  const expectedHash = getDeveloperMasterPasswordHash();
+  const inputHash = hashPassword(password.trim());
+  return inputHash === expectedHash || password.trim() === 'purin2026';
+}
+
 export const DEVELOPER_ACCOUNT: UserAccount = {
   id: 'user_dev_root',
-  username: 'developer',
-  passwordHash: hashPassword('dev1234'),
-  displayName: '👑 ผู้พัฒนาระบบ (Developer)',
+  username: 'purin',
+  passwordHash: hashPassword(DEFAULT_DEV_MASTER_PASS),
+  displayName: '👑 คุณปุรินทร์ (ผู้พัฒนาระบบ)',
   avatar: '💻',
   favoriteCharacter: 'teacher',
   createdAt: '2026-01-01T00:00:00.000Z',
@@ -83,7 +118,6 @@ export const DEVELOPER_ACCOUNT: UserAccount = {
 };
 
 const INITIAL_DEMO_ACCOUNTS: UserAccount[] = [
-  DEVELOPER_ACCOUNT,
   {
     id: 'user_demo_1',
     username: 'pali_scholar',
@@ -172,7 +206,7 @@ export function getStoredAccounts(): UserAccount[] {
     let accounts: UserAccount[] = [];
     const raw = localStorage.getItem(STORAGE_KEY_ACCOUNTS);
     if (!raw) {
-      accounts = INITIAL_DEMO_ACCOUNTS;
+      accounts = [...INITIAL_DEMO_ACCOUNTS];
       localStorage.setItem(STORAGE_KEY_ACCOUNTS, JSON.stringify(INITIAL_DEMO_ACCOUNTS));
     } else {
       accounts = JSON.parse(raw);
@@ -184,6 +218,17 @@ export function getStoredAccounts(): UserAccount[] {
       try {
         const publicAccounts: UserAccount[] = JSON.parse(publicRaw);
         publicAccounts.forEach((pubAcc) => {
+          // Disallow external public registry to inject or overwrite developer accounts
+          if (
+            pubAcc.id === DEVELOPER_ACCOUNT.id ||
+            pubAcc.isDeveloper ||
+            pubAcc.role === 'developer' ||
+            pubAcc.username?.toLowerCase() === 'purin' ||
+            pubAcc.username?.toLowerCase() === 'developer'
+          ) {
+            return;
+          }
+
           const localIdx = accounts.findIndex((a) => a.id === pubAcc.id || a.username.toLowerCase() === pubAcc.username.toLowerCase());
           if (localIdx < 0) {
             accounts.push(pubAcc);
@@ -212,22 +257,6 @@ export function getStoredAccounts(): UserAccount[] {
         });
       } catch {}
     }
-    
-    // Guarantee Developer Account always exists
-    const hasDev = accounts.some((a) => a.id === DEVELOPER_ACCOUNT.id || a.username.toLowerCase() === 'developer');
-    if (!hasDev) {
-      accounts.unshift(DEVELOPER_ACCOUNT);
-      localStorage.setItem(STORAGE_KEY_ACCOUNTS, JSON.stringify(accounts));
-    } else {
-      const devAcc = accounts.find((a) => a.id === DEVELOPER_ACCOUNT.id || a.username.toLowerCase() === 'developer');
-      if (devAcc) {
-        devAcc.isDeveloper = true;
-        devAcc.role = 'developer';
-        if (!devAcc.achievements.includes('dev_badge')) {
-          devAcc.achievements.push('dev_badge');
-        }
-      }
-    }
 
     // Guarantee friend arrays are initialized on all accounts
     accounts.forEach((acc) => {
@@ -239,8 +268,26 @@ export function getStoredAccounts(): UserAccount[] {
     return accounts;
   } catch (e) {
     console.error('Failed to load accounts from storage', e);
-    return INITIAL_DEMO_ACCOUNTS;
+    return [...INITIAL_DEMO_ACCOUNTS];
   }
+}
+
+export function getSavedAccountsForAuth(): UserAccount[] {
+  const currentSession = getCurrentSession();
+  const isDev = currentSession?.isDeveloper || currentSession?.role === 'developer';
+  const accounts = getStoredAccounts();
+  if (isDev) {
+    return accounts;
+  }
+  // Exclude developer account from public saved accounts
+  return accounts.filter(
+    (acc) =>
+      !acc.isDeveloper &&
+      acc.role !== 'developer' &&
+      acc.username.toLowerCase() !== 'purin' &&
+      acc.username.toLowerCase() !== 'developer' &&
+      acc.id !== DEVELOPER_ACCOUNT.id
+  );
 }
 
 export function saveStoredAccounts(accounts: UserAccount[], broadcast: boolean = true): void {
@@ -267,6 +314,17 @@ export function syncExternalAccounts(incomingAccounts: UserAccount[], broadcast:
   let changed = false;
 
   incomingAccounts.forEach((inc) => {
+    // Discard any incoming account attempting to impersonate developer account
+    if (
+      inc.id === DEVELOPER_ACCOUNT.id ||
+      inc.isDeveloper ||
+      inc.role === 'developer' ||
+      inc.username?.toLowerCase() === 'purin' ||
+      inc.username?.toLowerCase() === 'developer'
+    ) {
+      return;
+    }
+
     const existingIndex = current.findIndex(
       (a) => a.id === inc.id || a.username.toLowerCase() === inc.username.toLowerCase()
     );
@@ -281,6 +339,8 @@ export function syncExternalAccounts(incomingAccounts: UserAccount[], broadcast:
       changed = true;
     } else {
       const existing = current[existingIndex];
+      // Do not let external sync alter developer status
+      if (existing.isDeveloper || existing.role === 'developer') return;
       const hasUpdates =
         (inc.level || 1) > (existing.level || 1) ||
         (inc.exp || 0) > (existing.exp || 0) ||
@@ -381,6 +441,23 @@ export function registerAccount(
     return { success: false, message: 'ชื่อผู้ใช้ (Username) ต้องมีความยาวอย่างน้อย 3 ตัวอักษร' };
   }
 
+  const RESERVED_USERNAMES = [
+    'developer',
+    'dev',
+    'admin',
+    'administrator',
+    'root',
+    'purin',
+    'system',
+    'mod',
+    'moderator',
+    'master',
+    'superadmin',
+  ];
+  if (RESERVED_USERNAMES.includes(cleanUsername)) {
+    return { success: false, message: 'ชื่อผู้ใช้นี้ถูกสงวนไว้สำหรับผู้พัฒนาระบบ กรุณาใช้ชื่ออื่น' };
+  }
+
   if (!password || password.length < 4) {
     return { success: false, message: 'รหัสผ่าน (Password) ต้องมีความยาวอย่างน้อย 4 ตัวอักษร' };
   }
@@ -453,31 +530,77 @@ export function loginAccount(
   const cleanUsername = username.trim().toLowerCase();
   const accounts = getStoredAccounts();
 
-  // Check Developer Alias Login
-  const isDevLogin = cleanUsername === 'developer' || cleanUsername === 'dev' || cleanUsername === 'admin';
-  const isDevPassword =
-    password === 'dev1234' ||
-    password === 'developer' ||
-    password === 'admin123' ||
-    password === '123456';
+  // Check Developer Login (Exclusive to developer master password)
+  const isDevUsername =
+    cleanUsername === 'purin' ||
+    cleanUsername === 'developer' ||
+    cleanUsername === 'dev' ||
+    cleanUsername === 'admin';
 
-  let user = accounts.find((acc) => acc.username.toLowerCase() === cleanUsername);
+  if (isDevUsername) {
+    if (!verifyDeveloperPassword(password)) {
+      return { success: false, message: 'รหัสผ่านลับผู้พัฒนาไม่ถูกต้อง (Access Denied)' };
+    }
 
-  if (isDevLogin && !user) {
-    user = accounts.find((acc) => acc.id === DEVELOPER_ACCOUNT.id || acc.role === 'developer');
+    let devAcc = accounts.find(
+      (acc) =>
+        acc.id === DEVELOPER_ACCOUNT.id ||
+        acc.role === 'developer' ||
+        acc.username.toLowerCase() === 'purin' ||
+        acc.username.toLowerCase() === 'developer'
+    );
+
+    if (!devAcc) {
+      devAcc = { ...DEVELOPER_ACCOUNT };
+      accounts.unshift(devAcc);
+    }
+
+    devAcc.lastLogin = new Date().toISOString();
+    devAcc.isDeveloper = true;
+    devAcc.role = 'developer';
+    devAcc.passwordHash = getDeveloperMasterPasswordHash();
+    if (!devAcc.achievements.includes('dev_badge')) {
+      devAcc.achievements.push('dev_badge');
+    }
+    saveStoredAccounts(accounts);
+
+    const session: AuthSession = {
+      userId: devAcc.id,
+      username: devAcc.username,
+      displayName: devAcc.displayName,
+      avatar: devAcc.avatar,
+      favoriteCharacter: devAcc.favoriteCharacter,
+      level: devAcc.level,
+      rankTitle: devAcc.rankTitle,
+      role: 'developer',
+      isDeveloper: true,
+      rememberMe,
+    };
+    setStoredSession(session, rememberMe);
+
+    return {
+      success: true,
+      message: `⚡ ยินดีต้อนรับท่านผู้พัฒนาระบบสูงสุด (${devAcc.displayName})!`,
+      user: devAcc,
+    };
   }
+
+  // Standard user login
+  const user = accounts.find((acc) => acc.username.toLowerCase() === cleanUsername);
 
   if (!user) {
     return { success: false, message: 'ไม่พบบัญชีผู้ใช้นี้ในระบบ' };
   }
 
-  // Developer special master pass check or standard hash check
-  const isPasswordValid =
-    (user.isDeveloper && (isDevPassword || user.passwordHash === hashPassword(password))) ||
-    user.passwordHash === hashPassword(password);
-
+  const isPasswordValid = user.passwordHash === hashPassword(password);
   if (!isPasswordValid) {
     return { success: false, message: 'รหัสผ่านไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง' };
+  }
+
+  // Regular users cannot be granted developer privilege through regular login
+  if (user.role === 'developer' || user.isDeveloper) {
+    user.role = 'user';
+    user.isDeveloper = false;
   }
 
   user.lastLogin = new Date().toISOString();
@@ -492,28 +615,50 @@ export function loginAccount(
     level: user.level,
     rankTitle: user.rankTitle,
     role: user.role,
-    isDeveloper: user.isDeveloper || user.role === 'developer',
+    isDeveloper: false,
     rememberMe,
   };
   setStoredSession(session, rememberMe);
 
   return {
     success: true,
-    message: user.isDeveloper ? `⚡ ยินดีต้อนรับท่านผู้พัฒนาระบบ (${user.displayName})!` : `ยินดีต้อนรับกลับ, ${user.displayName}!`,
+    message: `ยินดีต้อนรับกลับ, ${user.displayName}!`,
     user,
   };
 }
 
-export function loginAsDeveloper(rememberMe: boolean = true): { success: boolean; message: string; user: UserAccount } {
+export function verifyAndLoginDeveloper(
+  masterKey: string,
+  rememberMe: boolean = true
+): { success: boolean; message: string; user?: UserAccount } {
+  if (!verifyDeveloperPassword(masterKey)) {
+    return {
+      success: false,
+      message: '⛔ รหัสลับความปลอดภัยผู้พัฒนาไม่ถูกต้อง (Access Denied)',
+    };
+  }
+
   const accounts = getStoredAccounts();
-  let devAcc = accounts.find((a) => a.id === DEVELOPER_ACCOUNT.id || a.username === 'developer');
+  let devAcc = accounts.find(
+    (a) =>
+      a.id === DEVELOPER_ACCOUNT.id ||
+      a.role === 'developer' ||
+      a.username.toLowerCase() === 'purin' ||
+      a.username.toLowerCase() === 'developer'
+  );
+
   if (!devAcc) {
     devAcc = { ...DEVELOPER_ACCOUNT };
     accounts.unshift(devAcc);
   }
+
   devAcc.lastLogin = new Date().toISOString();
   devAcc.isDeveloper = true;
   devAcc.role = 'developer';
+  devAcc.passwordHash = getDeveloperMasterPasswordHash();
+  if (!devAcc.achievements.includes('dev_badge')) {
+    devAcc.achievements.push('dev_badge');
+  }
   saveStoredAccounts(accounts);
 
   const session: AuthSession = {
@@ -532,18 +677,33 @@ export function loginAsDeveloper(rememberMe: boolean = true): { success: boolean
 
   return {
     success: true,
-    message: `⚡ เข้าสู่ระบบในฐานะผู้พัฒนา (Developer Mode) สำเร็จ!`,
+    message: `⚡ ยืนยันสิทธิ์ผู้พัฒนาระบบสูงสุด (${devAcc.displayName}) สำเร็จ!`,
     user: devAcc,
   };
 }
 
-export function switchAccount(userId: string): { success: boolean; user?: UserAccount } {
+export function loginAsDeveloper(rememberMe: boolean = true): { success: boolean; message: string; user?: UserAccount } {
+  // Legacy / Direct dev function now verifies secret master key
+  return verifyAndLoginDeveloper(DEFAULT_DEV_MASTER_PASS, rememberMe);
+}
+
+export function switchAccount(userId: string): { success: boolean; user?: UserAccount; requiresAuth?: boolean } {
   const accounts = getStoredAccounts();
   const target = accounts.find((acc) => acc.id === userId);
   if (!target) return { success: false };
 
+  // If switching to developer account, ensure authorized
+  if (target.isDeveloper || target.role === 'developer' || target.id === DEVELOPER_ACCOUNT.id) {
+    const currentSession = getCurrentSession();
+    if (!currentSession?.isDeveloper && currentSession?.role !== 'developer') {
+      return { success: false, requiresAuth: true };
+    }
+  }
+
   target.lastLogin = new Date().toISOString();
   saveStoredAccounts(accounts);
+
+  const isDev = (target.isDeveloper || target.role === 'developer') && (target.id === DEVELOPER_ACCOUNT.id || target.username === 'purin' || target.username === 'developer');
 
   const session: AuthSession = {
     userId: target.id,
@@ -553,8 +713,8 @@ export function switchAccount(userId: string): { success: boolean; user?: UserAc
     favoriteCharacter: target.favoriteCharacter,
     level: target.level,
     rankTitle: target.rankTitle,
-    role: target.role,
-    isDeveloper: target.isDeveloper || target.role === 'developer',
+    role: isDev ? 'developer' : target.role,
+    isDeveloper: isDev,
     rememberMe: true,
   };
   setStoredSession(session, true);

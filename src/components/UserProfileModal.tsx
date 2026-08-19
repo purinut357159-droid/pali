@@ -8,6 +8,7 @@ import {
   X,
   Sparkles,
   CheckCircle,
+  AlertCircle,
   Users,
   BarChart2,
   TrendingUp,
@@ -16,6 +17,8 @@ import {
   Zap,
   Cpu,
   RotateCcw,
+  KeyRound,
+  Lock,
 } from 'lucide-react';
 import type { UserAccount } from '../types/auth';
 import { ACHIEVEMENTS_LIST, getRankTitle } from '../types/auth';
@@ -26,6 +29,7 @@ import {
   devAddExp,
   devUnlockAllAchievements,
   devResetAccountStats,
+  setDeveloperMasterPassword,
 } from '../utils/authService';
 import { CHARACTERS } from '../data/charactersData';
 import type { CharacterId } from '../types/game';
@@ -62,6 +66,11 @@ export const UserProfileModal: React.FC<Props> = ({
   const [editFavoriteChar, setEditFavoriteChar] = useState<CharacterId>(user.favoriteCharacter);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [devActionMsg, setDevActionMsg] = useState<string | null>(null);
+
+  // Dev Master Password change state
+  const [newDevPass, setNewDevPass] = useState('');
+  const [devPassSuccess, setDevPassSuccess] = useState(false);
+  const [devPassError, setDevPassError] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
@@ -937,6 +946,119 @@ export const UserProfileModal: React.FC<Props> = ({
                 </button>
               </div>
 
+              {/* Developer Master Key Management */}
+              <div
+                style={{
+                  background: 'rgba(2, 132, 199, 0.08)',
+                  border: '1px solid rgba(56, 189, 248, 0.3)',
+                  borderRadius: '10px',
+                  padding: '14px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#38bdf8', fontSize: '0.85rem', fontWeight: 700, marginBottom: '8px' }}>
+                  <Lock size={16} />
+                  <span>ตั้งค่ารหัสผ่านลับผู้พัฒนาระบบ (Master Dev Key)</span>
+                </div>
+                <p style={{ margin: '0 0 10px 0', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
+                  รหัสนี้ใช้สำหรับเข้าสู่ระบบในฐานะผู้พัฒนาสูงสุด (เข้าถึงได้เฉพาะคุณปุรินทร์)
+                </p>
+
+                {devPassSuccess && (
+                  <div
+                    style={{
+                      background: 'rgba(16, 185, 129, 0.15)',
+                      border: '1px solid #10b981',
+                      borderRadius: '6px',
+                      padding: '6px 10px',
+                      marginBottom: '10px',
+                      color: '#6ee7b7',
+                      fontSize: '0.75rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    <CheckCircle size={14} color="#10b981" />
+                    <span>อัปเดตรหัสผ่านลับผู้พัฒนาเรียบร้อยแล้ว!</span>
+                  </div>
+                )}
+
+                {devPassError && (
+                  <div
+                    style={{
+                      background: 'rgba(239, 68, 68, 0.15)',
+                      border: '1px solid #ef4444',
+                      borderRadius: '6px',
+                      padding: '6px 10px',
+                      marginBottom: '10px',
+                      color: '#fca5a5',
+                      fontSize: '0.75rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    <AlertCircle size={14} color="#ef4444" />
+                    <span>{devPassError}</span>
+                  </div>
+                )}
+
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    setDevPassError(null);
+                    if (!newDevPass || newDevPass.trim().length < 4) {
+                      setDevPassError('รหัสผ่านต้องมีความยาวอย่างน้อย 4 ตัวอักษร');
+                      return;
+                    }
+                    const ok = setDeveloperMasterPassword(newDevPass.trim());
+                    if (ok) {
+                      setDevPassSuccess(true);
+                      setNewDevPass('');
+                      setTimeout(() => setDevPassSuccess(false), 3000);
+                    } else {
+                      setDevPassError('ไม่สามารถบันทึกรหัสผ่านได้ กรุณาลองใหม่อีกครั้ง');
+                    }
+                  }}
+                  style={{ display: 'flex', gap: '8px' }}
+                >
+                  <input
+                    type="password"
+                    value={newDevPass}
+                    onChange={(e) => setNewDevPass(e.target.value)}
+                    placeholder="กำหนดรหัสผ่านลับใหม่..."
+                    style={{
+                      flex: 1,
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      background: 'rgba(0,0,0,0.5)',
+                      border: '1px solid rgba(56, 189, 248, 0.4)',
+                      color: '#fff',
+                      fontSize: '0.8rem',
+                    }}
+                  />
+                  <button
+                    type="submit"
+                    style={{
+                      padding: '8px 14px',
+                      borderRadius: '6px',
+                      background: 'linear-gradient(135deg, #0284c7, #0369a1)',
+                      border: '1px solid #38bdf8',
+                      color: '#fff',
+                      fontWeight: 700,
+                      fontSize: '0.78rem',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}
+                  >
+                    <KeyRound size={13} />
+                    บันทึกรหัส
+                  </button>
+                </form>
+              </div>
+
               {/* Developer Metadata Info */}
               <div
                 style={{
@@ -954,6 +1076,7 @@ export const UserProfileModal: React.FC<Props> = ({
                 <div><strong>User ID:</strong> <code style={{ color: '#38bdf8' }}>{user.id}</code></div>
                 <div><strong>Username:</strong> <code style={{ color: '#f59e0b' }}>{user.username}</code></div>
                 <div><strong>Role:</strong> <code style={{ color: '#10b981' }}>{user.role || 'developer'}</code> (Super Admin)</div>
+                <div><strong>Security Isolation:</strong> <span style={{ color: '#38bdf8' }}>🔒 ล็อกความปลอดภัยเฉพาะคุณปุรินทร์ (Exclusive Access)</span></div>
                 <div><strong>Session Persistence:</strong> <span style={{ color: '#10b981' }}>✓ LocalStorage (Persistent)</span></div>
               </div>
             </div>

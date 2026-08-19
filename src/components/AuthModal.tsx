@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   LogIn,
   UserPlus,
@@ -10,13 +10,14 @@ import {
   X,
   Sparkles,
   ShieldCheck,
-  Terminal,
+  Lock,
+  KeyRound,
 } from 'lucide-react';
 import {
   loginAccount,
-  loginAsDeveloper,
+  verifyAndLoginDeveloper,
   registerAccount,
-  getStoredAccounts,
+  getSavedAccountsForAuth,
   switchAccount,
 } from '../utils/authService';
 import type { UserAccount } from '../types/auth';
@@ -57,9 +58,28 @@ export const AuthModal: React.FC<Props> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+  // Secret Developer Authentication State
+  const [showSecretDevAuth, setShowSecretDevAuth] = useState(false);
+  const [secretDevKey, setSecretDevKey] = useState('');
+  const [secretDevError, setSecretDevError] = useState<string | null>(null);
+  const logoTapRef = React.useRef(0);
+
+  // Keyboard shortcut listener for developer portal (Ctrl + Shift + D)
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'D' || e.key === 'd')) {
+        e.preventDefault();
+        setShowSecretDevAuth((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
-  const savedAccounts = getStoredAccounts();
+  const savedAccounts = getSavedAccountsForAuth();
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -78,16 +98,19 @@ export const AuthModal: React.FC<Props> = ({
     }
   };
 
-  const handleDevLogin = () => {
-    setErrorMessage(null);
-    setSuccessMessage(null);
-    const res = loginAsDeveloper(rememberMe);
+  const handleSecretDevLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSecretDevError(null);
+    const res = verifyAndLoginDeveloper(secretDevKey, rememberMe);
     if (res.success && res.user) {
       setSuccessMessage(res.message);
+      setShowSecretDevAuth(false);
       setTimeout(() => {
-        onLoginSuccess(res.user);
+        onLoginSuccess(res.user!);
         onClose();
       }, 400);
+    } else {
+      setSecretDevError(res.message);
     }
   };
 
@@ -126,6 +149,14 @@ export const AuthModal: React.FC<Props> = ({
     }
   };
 
+  const handleLogoTap = () => {
+    logoTapRef.current += 1;
+    if (logoTapRef.current >= 5) {
+      setShowSecretDevAuth(true);
+      logoTapRef.current = 0;
+    }
+  };
+
   return (
     <div className="modal-overlay" style={{ zIndex: 1000 }}>
       <div
@@ -159,7 +190,21 @@ export const AuthModal: React.FC<Props> = ({
 
         {/* Modal Header */}
         <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-          <div style={{ fontSize: '2.5rem', marginBottom: '4px' }}>🏛️</div>
+          <div
+            onClick={handleLogoTap}
+            style={{
+              fontSize: '2.5rem',
+              marginBottom: '4px',
+              cursor: 'pointer',
+              userSelect: 'none',
+              transition: 'transform 0.15s ease',
+            }}
+            onMouseDown={(e) => (e.currentTarget.style.transform = 'scale(0.92)')}
+            onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+            title="บาลีส่วนฐี (กด 5 ครั้งสำหรับผู้สร้างระบบ)"
+          >
+            🏛️
+          </div>
           <h2 className="gold-gradient-text" style={{ fontSize: '1.6rem', margin: 0 }}>
             บัญชีผู้เล่นบาลีส่วนฐี
           </h2>
@@ -167,6 +212,150 @@ export const AuthModal: React.FC<Props> = ({
             บันทึกสถิติ ท่องจำคำศัพท์ และสะสมเลเวลมหาเปรียญ
           </p>
         </div>
+
+        {/* SECRET DEVELOPER AUTHENTICATION MODAL CARD */}
+        {showSecretDevAuth ? (
+          <div
+            style={{
+              background: 'linear-gradient(135deg, rgba(2, 132, 199, 0.18), rgba(15, 23, 42, 0.95))',
+              border: '2px solid #38bdf8',
+              boxShadow: '0 0 35px rgba(56, 189, 248, 0.35)',
+              borderRadius: '14px',
+              padding: '20px',
+              marginBottom: '16px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div
+                  style={{
+                    width: '36px',
+                    height: '36px',
+                    borderRadius: '10px',
+                    background: 'rgba(56, 189, 248, 0.2)',
+                    border: '1px solid #38bdf8',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Lock size={18} color="#38bdf8" />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, color: '#38bdf8', fontSize: '0.98rem', fontWeight: 800 }}>
+                    ประตูสิทธิ์ผู้พัฒนาระบบ (Developer Key)
+                  </h3>
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                    เฉพาะคุณปุรินทร์ (ผู้สร้างเกม) เท่านั้นที่เข้าถึงได้
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSecretDevAuth(false);
+                  setSecretDevError(null);
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {secretDevError && (
+              <div
+                style={{
+                  background: 'rgba(239, 68, 68, 0.2)',
+                  border: '1px solid #ef4444',
+                  borderRadius: '8px',
+                  padding: '8px 12px',
+                  marginBottom: '14px',
+                  color: '#fca5a5',
+                  fontSize: '0.8rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <AlertCircle size={15} color="#ef4444" />
+                <span>{secretDevError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSecretDevLogin}>
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', fontSize: '0.82rem', color: '#38bdf8', marginBottom: '6px', fontWeight: 600 }}>
+                  รหัสผ่านลับผู้พัฒนาระบบ (Master Security Key):
+                </label>
+                <input
+                  type="password"
+                  value={secretDevKey}
+                  onChange={(e) => setSecretDevKey(e.target.value)}
+                  placeholder="กรอกรหัสผ่านลับผู้พัฒนา..."
+                  required
+                  autoFocus
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    background: 'rgba(0, 0, 0, 0.6)',
+                    border: '1px solid rgba(56, 189, 248, 0.5)',
+                    color: '#fff',
+                    fontSize: '0.95rem',
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  type="submit"
+                  style={{
+                    flex: 1,
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    background: 'linear-gradient(135deg, #0284c7, #0369a1)',
+                    border: '1px solid #38bdf8',
+                    color: '#fff',
+                    fontWeight: 700,
+                    fontSize: '0.85rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    boxShadow: '0 0 15px rgba(56, 189, 248, 0.3)',
+                  }}
+                >
+                  <KeyRound size={15} />
+                  <span>ยืนยันสิทธิ์ผู้พัฒนา ➔</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSecretDevAuth(false);
+                    setSecretDevError(null);
+                  }}
+                  style={{
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    color: 'var(--text-muted)',
+                    fontSize: '0.85rem',
+                    cursor: 'pointer',
+                  }}
+                >
+                  ยกเลิก
+                </button>
+              </div>
+            </form>
+          </div>
+        ) : null}
 
         {/* Tab Navigation */}
         <div
@@ -399,55 +588,6 @@ export const AuthModal: React.FC<Props> = ({
               <LogIn size={18} />
               เข้าสู่ระบบ
             </button>
-
-            {/* Quick Developer Login Card */}
-            <div
-              style={{
-                marginTop: '16px',
-                padding: '10px 12px',
-                borderRadius: '10px',
-                background: 'linear-gradient(135deg, rgba(6, 182, 212, 0.12), rgba(212, 175, 55, 0.12))',
-                border: '1px dashed rgba(6, 182, 212, 0.5)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: '8px',
-                flexWrap: 'wrap',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
-                <span style={{ fontSize: '1.3rem' }}>👑</span>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#38bdf8' }}>
-                    ไอดีผู้พัฒนา (Dev ID)
-                  </div>
-                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                    User: <code style={{ color: '#f59e0b' }}>developer</code> | Pass: <code style={{ color: '#f59e0b' }}>dev1234</code>
-                  </div>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={handleDevLogin}
-                style={{
-                  padding: '6px 12px',
-                  borderRadius: '8px',
-                  background: 'linear-gradient(135deg, #0284c7, #0369a1)',
-                  border: '1px solid #38bdf8',
-                  color: '#fff',
-                  fontSize: '0.75rem',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  boxShadow: '0 0 10px rgba(56, 189, 248, 0.3)',
-                }}
-              >
-                <Terminal size={13} />
-                <span>เข้าโหมด Dev (1-Click)</span>
-              </button>
-            </div>
           </form>
         )}
 
