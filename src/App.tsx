@@ -102,6 +102,26 @@ export const App: React.FC = () => {
   const [rolledDoubles, setRolledDoubles] = useState<boolean>(false);
   const [movingPlayerId, setMovingPlayerId] = useState<string | null>(null);
 
+  // Unlock audio context & start looping BGM on first user interaction
+  useEffect(() => {
+    const onFirstUserGesture = () => {
+      audioManager.handleUserGesture();
+      window.removeEventListener('click', onFirstUserGesture);
+      window.removeEventListener('keydown', onFirstUserGesture);
+      window.removeEventListener('touchstart', onFirstUserGesture);
+    };
+
+    window.addEventListener('click', onFirstUserGesture);
+    window.addEventListener('keydown', onFirstUserGesture);
+    window.addEventListener('touchstart', onFirstUserGesture);
+
+    return () => {
+      window.removeEventListener('click', onFirstUserGesture);
+      window.removeEventListener('keydown', onFirstUserGesture);
+      window.removeEventListener('touchstart', onFirstUserGesture);
+    };
+  }, []);
+
   // Parse URL query parameter ?room=PALI-XXXX on mount
   useEffect(() => {
     try {

@@ -1,7 +1,8 @@
-import React from 'react';
-import { Volume2, VolumeX, BookOpen, RefreshCw, LogIn, Trophy, Users, Globe } from 'lucide-react';
+import React, { useState } from 'react';
+import { Volume2, VolumeX, BookOpen, RefreshCw, LogIn, Trophy, Users, Globe, Music, Music2 } from 'lucide-react';
 import type { GameState } from '../types/game';
 import type { UserAccount } from '../types/auth';
+import { audioManager, BGM_THEMES, type BGMThemeId } from '../utils/audioManager';
 
 interface Props {
   gameState: GameState;
@@ -38,6 +39,12 @@ export const GameHeader: React.FC<Props> = ({
 }) => {
   const currentTurnPlayer = gameState.players[gameState.currentTurnPlayerIndex];
   const dueReviewsCount = gameState.reviewItems.filter((i) => !i.mastered).length;
+
+  const bgmState = audioManager.getBGMState();
+  const [isBgmActive, setIsBgmActive] = useState<boolean>(bgmState.isPlaying);
+  const [bgmVol, setBgmVol] = useState<number>(bgmState.volume);
+  const [bgmTheme, setBgmTheme] = useState<BGMThemeId>(bgmState.theme);
+  const [showMusicPanel, setShowMusicPanel] = useState<boolean>(false);
 
   return (
     <header className="glass-panel game-header" style={{ padding: '12px 20px', marginBottom: '16px' }}>
@@ -244,11 +251,190 @@ export const GameHeader: React.FC<Props> = ({
             )}
           </button>
 
+          {/* BGM Music Control Button & Dropdown */}
+          <div style={{ position: 'relative' }}>
+            <button
+              onClick={() => setShowMusicPanel(!showMusicPanel)}
+              className="secondary-button"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '8px 12px',
+                border: isBgmActive ? '1.5px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.15)',
+                background: isBgmActive
+                  ? 'linear-gradient(135deg, rgba(2, 132, 199, 0.25), rgba(212, 175, 55, 0.15))'
+                  : 'rgba(255, 255, 255, 0.05)',
+                boxShadow: isBgmActive ? '0 0 15px rgba(56, 189, 248, 0.3)' : 'none',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+              }}
+              title="ดนตรีบรรเลงวน (Looping Background Music)"
+            >
+              <Music size={17} color={isBgmActive ? '#38bdf8' : 'var(--text-muted)'} />
+              <span style={{ fontSize: '0.82rem', color: isBgmActive ? '#e0f2fe' : 'var(--text-muted)', fontWeight: 600 }}>
+                {isBgmActive ? (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <span>เพลงวน</span>
+                    <span className="pulse-active" style={{ fontSize: '0.7rem' }}>▶</span>
+                  </span>
+                ) : (
+                  'เพลงวน (ปิด)'
+                )}
+              </span>
+            </button>
+
+            {/* BGM Quick Control Popover Panel */}
+            {showMusicPanel && (
+              <div
+                className="glass-panel"
+                style={{
+                  position: 'absolute',
+                  top: '110%',
+                  right: 0,
+                  width: '280px',
+                  padding: '16px',
+                  borderRadius: '14px',
+                  border: '1.5px solid #38bdf8',
+                  boxShadow: '0 10px 30px rgba(0, 0, 0, 0.7), 0 0 20px rgba(56, 189, 248, 0.25)',
+                  zIndex: 200,
+                  background: 'linear-gradient(145deg, rgba(15, 23, 42, 0.96), rgba(9, 14, 26, 0.98))',
+                  animation: 'fadeIn 0.2s ease-out',
+                }}
+              >
+                {/* Panel Header */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Music2 size={18} color="#38bdf8" />
+                    <strong style={{ fontSize: '0.9rem', color: '#38bdf8' }}>ดนตรีบรรเลงวน (BGM)</strong>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowMusicPanel(false)}
+                    style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {/* Main Play / Pause Toggle Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newState = audioManager.toggleBGM();
+                    setIsBgmActive(newState);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    borderRadius: '10px',
+                    border: isBgmActive ? '1px solid #10b981' : '1px solid rgba(255, 255, 255, 0.2)',
+                    background: isBgmActive
+                      ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.25), rgba(6, 182, 212, 0.2))'
+                      : 'rgba(255, 255, 255, 0.05)',
+                    color: isBgmActive ? '#6ee7b7' : '#fff',
+                    fontWeight: 700,
+                    fontSize: '0.85rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    marginBottom: '14px',
+                    transition: 'all 0.2s',
+                  }}
+                >
+                  {isBgmActive ? (
+                    <>
+                      <span>⏸️ พักเพลงบรรเลง</span>
+                      <span style={{ fontSize: '0.72rem', color: '#a7f3d0' }}>(กำลังเล่นวน)</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>▶️ เริ่มเล่นเพลงบรรเลงวน</span>
+                    </>
+                  )}
+                </button>
+
+                {/* Volume Slider */}
+                <div style={{ marginBottom: '14px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                    <span>ระดับเสียงดนตรี:</span>
+                    <strong style={{ color: '#38bdf8' }}>{Math.round(bgmVol * 100)}%</strong>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={bgmVol}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      setBgmVol(val);
+                      audioManager.setBGMVolume(val);
+                    }}
+                    style={{ width: '100%', accentColor: '#38bdf8', cursor: 'pointer' }}
+                  />
+                </div>
+
+                {/* Track Theme Selector */}
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--primary-gold)', fontWeight: 700, marginBottom: '6px' }}>
+                    เลือกบทเพลงบรรเลงวน (Looping Tracks):
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    {BGM_THEMES.map((theme) => {
+                      const isSelected = bgmTheme === theme.id;
+                      return (
+                        <div
+                          key={theme.id}
+                          onClick={() => {
+                            setBgmTheme(theme.id);
+                            audioManager.setBGMTheme(theme.id);
+                            if (!isBgmActive) {
+                              setIsBgmActive(true);
+                              audioManager.toggleBGM();
+                            }
+                          }}
+                          style={{
+                            padding: '8px 10px',
+                            borderRadius: '8px',
+                            border: isSelected ? '1.5px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.08)',
+                            background: isSelected ? 'rgba(6, 182, 212, 0.2)' : 'rgba(255, 255, 255, 0.03)',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            transition: 'all 0.15s',
+                          }}
+                        >
+                          <span style={{ fontSize: '1.2rem' }}>{theme.icon}</span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: '0.8rem', fontWeight: isSelected ? 700 : 500, color: isSelected ? '#38bdf8' : '#fff' }}>
+                              {theme.name}
+                            </div>
+                            <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {theme.subtitle}
+                            </div>
+                          </div>
+                          {isSelected && isBgmActive && (
+                            <span style={{ fontSize: '0.75rem', color: '#38bdf8' }}>♫</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Sound Effects Mute Button */}
           <button
             onClick={onToggleMute}
             className="secondary-button"
             style={{ padding: '8px 12px' }}
-            title={isMuted ? 'เปิดเสียง' : 'ปิดเสียง'}
+            title={isMuted ? 'เปิดเสียงเอฟเฟกต์ (SFX)' : 'ปิดเสียงเอฟเฟกต์ (SFX)'}
           >
             {isMuted ? <VolumeX size={18} color="#ef4444" /> : <Volume2 size={18} color="#10b981" />}
           </button>
